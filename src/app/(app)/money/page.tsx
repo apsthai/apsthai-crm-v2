@@ -16,7 +16,7 @@ export default async function Money() {
   const [{ data: recs }, { data: invoices }, { data: payments }, lk] = await Promise.all([
     sb.from("receivables").select("*, school:schools(name), partner:partners(name), case:cases(id, student:students(codename))")
       .in("status", ["expected", "invoiced", "partially_paid"]).order("expected_date").limit(500),
-    sb.from("invoices").select("id, invoice_no, date, bill_to_name, currency, total, status").order("date", { ascending: false }).limit(100),
+    sb.from("invoices").select("id, invoice_no, external_doc_no, date, bill_to_name, currency, total, status").order("date", { ascending: false }).limit(100),
     sb.from("payments").select("id, received_date, received_thb, vat_thb, wht_thb, revenue_ex_vat, invoice:invoices(id, invoice_no), payment_lines(amount, receivable:receivables(case:cases(student:students(codename))))")
       .order("received_date", { ascending: false }).limit(50),
     loadLookups(sb),
@@ -77,10 +77,10 @@ export default async function Money() {
       <Card title={t("invoices")}>
         {!invoices?.length ? <Empty text={t("none")} /> : (
           <div className="overflow-x-auto"><table className="tbl">
-            <thead><tr><th>{t("invoiceNo")}</th><th>{t("date")}</th><th>{t("billTo")}</th><th>{t("total")}</th><th>{t("status")}</th></tr></thead>
+            <thead><tr><th>{t("invoiceNo")}</th><th>{t("flowNo")}</th><th>{t("date")}</th><th>{t("billTo")}</th><th>{t("total")}</th><th>{t("status")}</th></tr></thead>
             <tbody>{invoices.map((i: any) => (
               <tr key={i.id}>
-                <td><A href={`/money/invoices/${i.id}`}>{i.invoice_no}</A></td><td>{fmtDate(i.date, lang)}</td><td>{i.bill_to_name}</td>
+                <td><A href={`/money/invoices/${i.id}`}>{i.invoice_no}</A></td><td>{i.external_doc_no ?? "-"}</td><td>{fmtDate(i.date, lang)}</td><td>{i.bill_to_name}</td>
                 <td>{fmtMoney(i.total, i.currency)}</td><td><Pill status={i.status} label={t(i.status)} /></td>
               </tr>))}</tbody>
           </table></div>

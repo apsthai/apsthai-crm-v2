@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 import { A, Card, Field, Pill } from "@/components/ui";
 import { requireAdmin } from "@/lib/auth";
@@ -24,7 +23,6 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h1 className="h1">{inv.invoice_no} <Pill status={inv.status} label={t(inv.status)} /></h1>
         <div className="flex flex-wrap gap-2">
-          <Link href={`/money/invoices/${id}/print`} className="btn-ghost" target="_blank">{t("print")}</Link>
           {draft && <form action={setInvoiceStatus}><input type="hidden" name="id" value={id} /><button name="status" value="issued" className="btn">{t("issue")}</button></form>}
           {open && (
             <details><summary className="btn-danger cursor-pointer list-none">{t("cancelled")}</summary>
@@ -39,7 +37,7 @@ export default async function InvoicePage({ params }: { params: Promise<{ id: st
           <input type="hidden" name="id" value={id} />
           <Field label={t("billTo")}><input name="bill_to_name" className="input" defaultValue={inv.bill_to_name} required /></Field>
           <Field label={t("billToAddress")}><textarea name="bill_to_address" rows={2} className="input" defaultValue={inv.bill_to_address ?? ""} /></Field>
-          <Field label="FlowAccount"><input name="external_doc_no" className="input" defaultValue={inv.external_doc_no ?? ""} /></Field>
+          <Field label={t("flowNo")}><input name="external_doc_no" className="input" defaultValue={inv.external_doc_no ?? ""} /></Field>
           <Field label={t("date")}><input name="date" type="date" className="input" defaultValue={inv.date} /></Field>
           <Field label={t("dueDate")}><input name="due_date" type="date" className="input" defaultValue={inv.due_date ?? ""} /></Field>
           <div className="flex items-end"><button className="btn-ghost">{t("save")}</button></div>

@@ -173,7 +173,7 @@ export const dict = {
   billTo: ["ชื่อบนเอกสาร", "Bill to"],
   billToAddress: ["ที่อยู่บนเอกสาร", "Address"],
   dueDate: ["ครบกำหนด", "Due date"],
-  print: ["พิมพ์ / PDF", "Print / PDF"],
+  flowNo: ["เลขที่เอกสาร FlowAccount", "FlowAccount doc no."],
   issue: ["ออก invoice", "Issue"],
   selectReceivables: ["เลือกรายการ (ผู้จ่ายและสกุลเงินเดียวกัน)", "Pick items (same payer and currency)"],
   recordPayment: ["บันทึกเงินเข้า", "Record payment"],
