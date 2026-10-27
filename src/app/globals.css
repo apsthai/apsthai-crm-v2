@@ -25,3 +25,13 @@ body { @apply bg-slate-50 text-slate-900 antialiased; font-family: "Sarabun", "N
   .no-print { display: none !important; }
   body { background: white; }
 }
+
+/* progress feedback */
+.pending-bar { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 50; overflow: hidden; background: rgb(14 116 144 / 0.15); }
+.pending-bar::after { content: ""; position: absolute; inset: 0; width: 40%; background: #0369a1; animation: pending-slide 1s ease-in-out infinite; }
+@keyframes pending-slide { from { transform: translateX(-100%); } to { transform: translateX(250%); } }
+button.is-busy { position: relative; color: transparent !important; cursor: progress; }
+button.is-busy::after { content: ""; position: absolute; inset: 0; margin: auto; width: 1rem; height: 1rem; border-radius: 9999px;
+  border: 2px solid currentColor; border-color: #0369a1 #0369a133 #0369a133 #0369a133; animation: spin 0.7s linear infinite; }
+.btn.is-busy::after { border-color: #fff #ffffff55 #ffffff55 #ffffff55; }
+@keyframes spin { to { transform: rotate(360deg); } }

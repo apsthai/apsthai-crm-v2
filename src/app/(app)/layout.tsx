@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Suspense } from "react";
 import { Flash } from "@/components/flash";
+import { PendingUI } from "@/components/pending";
 import { getMe } from "@/lib/auth";
 import { getT } from "@/lib/i18n";
 import { LangSwitch } from "./lang-switch";
@@ -27,6 +28,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="min-h-screen">
+      <Suspense><PendingUI /></Suspense>
       <header className="no-print border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2">
           <Link href="/" className="font-semibold text-sky-800">APSthai CRM</Link>
