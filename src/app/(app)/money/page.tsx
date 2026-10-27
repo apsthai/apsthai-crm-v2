@@ -45,7 +45,7 @@ export default async function Money() {
                 <td className="whitespace-nowrap">{fmtMoney(r.amount, r.currency)}</td>
                 <td><Pill status={r.status} label={t(r.status)} /></td>
                 <td className="whitespace-nowrap">
-                  <Link className="link text-xs" href={`/money/invoices/new?${new URLSearchParams({ payer: payerKey(r), currency: r.currency })}`}>{t("newInvoice")}</Link>
+                  <Link className="link text-xs" href={`/money/invoices/new?${new URLSearchParams({ pick: `${payerKey(r)}|${r.currency}` })}`}>{t("newInvoice")}</Link>
                   {r.status === "partially_paid" && (
                     <form action={updateReceivable} className="inline">
                       <input type="hidden" name="id" value={r.id} /><input type="hidden" name="back" value="/money" />

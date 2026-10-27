@@ -5,7 +5,7 @@ import { getT } from "@/lib/i18n";
 import { payerKey, remaining } from "@/lib/money";
 import { createInvoice } from "../../actions";
 
-export default async function NewInvoice({ searchParams }: { searchParams: Promise<{ payer?: string; currency?: string }> }) {
+export default async function NewInvoice({ searchParams }: { searchParams: Promise<{ pick?: string }> }) {
   const { supabase: sb } = await requireAdmin();
   const { t, lang } = await getT();
   const sp = await searchParams;
@@ -23,7 +23,7 @@ export default async function NewInvoice({ searchParams }: { searchParams: Promi
     if (!groups.has(k)) groups.set(k, { key: payerKey(r), currency: r.currency, label: `${r.school?.name ?? r.partner?.name ?? r.payer_name} · ${r.currency}`, rows: [] });
     groups.get(k)!.rows.push(r);
   }
-  const chosen = sp.payer ? groups.get(`${sp.payer}|${sp.currency}`) : undefined;
+  const chosen = sp.pick ? groups.get(sp.pick) : undefined;
   const sample = chosen?.rows[0];
 
   return (
@@ -35,7 +35,7 @@ export default async function NewInvoice({ searchParams }: { searchParams: Promi
             <option value="">{t("payer")}</option>
             {[...groups.entries()].map(([k, g]) => <option key={k} value={k}>{g.label} ({g.rows.length})</option>)}
           </select>
-          <button className="btn-ghost" formAction="/money/invoices/new/pick">{t("search")}</button>
+          <button className="btn-ghost">{t("search")}</button>
         </form>
       </Card>
       {chosen && (

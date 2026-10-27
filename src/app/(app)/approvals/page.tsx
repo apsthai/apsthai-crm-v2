@@ -23,7 +23,7 @@ export default async function Approvals() {
       <Card title={t("pendingApprovals")}>
         {!pending?.length ? <Empty text={t("none")} /> : (
           <div className="overflow-x-auto"><table className="tbl">
-            <thead><tr><th>{t("student")}</th><th>{t("category")}</th><th>{t("product")}</th><th>{t("stage")}</th><th>{t("date")}</th><th>{t("staff")}</th><th /></tr></thead>
+            <thead><tr><th>{t("student")}</th><th>{t("category")}</th><th>{t("product")}</th><th>{t("stage")}</th><th>{t("date")}</th><th>{t("recordedBy")}</th><th /></tr></thead>
             <tbody>{pending.map((p: any) => (
               <tr key={p.id}>
                 <td><A href={`/cases/${p.case_id}`}>{p.case?.student?.codename}</A></td>
@@ -43,7 +43,7 @@ export default async function Approvals() {
           </table></div>
         )}
       </Card>
-      <Card title={`${t("success")} (60 days)`}>
+      <Card title={`${t("success")} (${t("last60")})`}>
         <p className="muted mb-2">{t("revertHint")}</p>
         {!recent?.length ? <Empty text={t("none")} /> : (
           <ul className="space-y-1 text-sm">{recent.map((c: any) => (

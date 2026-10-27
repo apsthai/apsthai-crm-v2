@@ -8,7 +8,7 @@ import { todayBangkok } from "@/lib/format";
 export async function createInvoice(fd: FormData) {
   const { supabase: sb } = await requireAdmin();
   const ids = fd.getAll("receivable_id").map(String).filter(Boolean);
-  const ret = `/money/invoices/new?${new URLSearchParams({ payer: str(fd, "payer_key") ?? "", currency: str(fd, "currency") ?? "" })}`;
+  const ret = `/money/invoices/new?${new URLSearchParams({ pick: `${str(fd, "payer_key")}|${str(fd, "currency")}` })}`;
   if (!ids.length) done(ret, "Pick at least one item");
   const { data: recs, error: e1 } = await sb.from("receivables")
     .select("id, amount, currency, payer_type, school_id, partner_id, payment_lines(amount), case:cases(intake, student:students(codename))").in("id", ids);

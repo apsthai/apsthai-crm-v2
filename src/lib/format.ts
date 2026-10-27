@@ -7,6 +7,14 @@ export function fmtDate(iso?: string | null, lang: "th" | "en" = "th") {
   const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
   return `${d} ${(lang === "en" ? EN_MONTHS : TH_MONTHS)[m - 1]} ${y}`;
 }
+// Timestamp shown as Bangkok local date and time, e.g. "28 ต.ค. 2026 02:42"
+export function fmtDateTime(ts?: string | null, lang: "th" | "en" = "th") {
+  if (!ts) return "";
+  const p = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Bangkok", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(new Date(ts)).map((x) => [x.type, x.value]));
+  return `${fmtDate(`${p.year}-${p.month}-${p.day}`, lang)} ${p.hour}:${p.minute}`;
+}
 export function fmtMonth(iso?: string | null, lang: "th" | "en" = "th") {
   if (!iso) return "";
   const [y, m] = iso.slice(0, 7).split("-").map(Number);

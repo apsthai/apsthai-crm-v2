@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { A, Card, Empty, Field, Pill } from "@/components/ui";
 import { NamedSelect } from "@/components/pickers";
 import { getMe } from "@/lib/auth";
-import { CURRENCIES, fmtDate, fmtMoney, todayBangkok } from "@/lib/format";
+import { CURRENCIES, fmtDate, fmtDateTime, fmtMoney, todayBangkok } from "@/lib/format";
 import { getT } from "@/lib/i18n";
 import { loadLookups } from "@/lib/lookups";
 import {
@@ -286,7 +286,7 @@ export default async function CasePage({ params }: { params: Promise<{ id: strin
             <li key={u.id}>{fmtDate(u.date, lang)} · {staffName.get(u.created_by) ?? "-"} · {n(stageById.get(u.stage_id))} → {t(u.status)}{u.approval !== "not_required" ? ` (${t(u.approval)})` : ""}{u.remark ? ` · ${u.remark}` : ""}</li>
           ))}
           {(log ?? []).map((l: any) => (
-            <li key={l.id} className="text-slate-400">{l.changed_at.slice(0, 16).replace("T", " ")} · {staffName.get(l.changed_by) ?? "system"} · {l.table_name}.{l.field ?? l.action}: {l.old_value ?? ""} → {l.new_value ?? ""}</li>
+            <li key={l.id} className="text-slate-400">{fmtDateTime(l.changed_at, lang)} · {staffName.get(l.changed_by) ?? "system"} · {l.table_name}.{l.field ?? l.action}: {l.old_value ?? ""} → {l.new_value ?? ""}</li>
           ))}
         </ul>
       </Card>
