@@ -20,6 +20,7 @@ export async function updateSession(request: NextRequest) {
   const signedIn = Boolean(data?.claims);
   const { pathname } = request.nextUrl;
   const isLogin = pathname === "/login";
+  if (pathname === "/auth/signout") return response;
 
   if (!signedIn && !isLogin) {
     const url = request.nextUrl.clone();

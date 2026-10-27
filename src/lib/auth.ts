@@ -11,7 +11,7 @@ export type Me = {
 export const getMe = cache(async (): Promise<Me & { supabase: Awaited<ReturnType<typeof createClient>> }> => {
   const supabase = await createClient();
   const { data: u } = await supabase.auth.getUser();
-  if (!u.user) redirect("/login");
+  if (!u.user) redirect("/auth/signout");
   // Right after sign-in the database can briefly reject a brand-new token (clock skew, PGRST303).
   // Retry instead of treating that as "no access"; only a clean "not found / inactive" means no access.
   let me: { active: boolean } & Record<string, unknown> | null = null;
