@@ -26,7 +26,7 @@ export default async function CasePage({ params }: { params: Promise<{ id: strin
   if (!c) notFound();
 
   const [{ data: staff }, { data: apps }, { data: stages }, { data: latest }, { data: updates }, { data: recs }, { data: products }, { data: myCase }, { data: myTeams }, lk] = await Promise.all([
-    sb.from("case_staff").select("id, start_date, end_date, staff(id, codename)").eq("case_id", id).order("start_date"),
+    sb.from("case_staff").select("id, start_date, end_date, staff:staff!case_staff_staff_id_fkey(id, codename)").eq("case_id", id).order("start_date"),
     sb.from("applications").select("*, product:products(id, school:schools(name), partner:partners(name)), feedback(*)").eq("case_id", id).order("created_at"),
     sb.from("stages").select("id, name_th, name_en, sort_order, level, milestone, editable_by_team_id").eq("category_id", c.category_id).eq("active", true).order("sort_order"),
     sb.from("v_stage_latest").select("*").eq("case_id", id),

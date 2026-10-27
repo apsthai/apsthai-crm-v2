@@ -6,7 +6,7 @@ import { saveCategory, saveStage } from "../actions";
 export default async function CategoriesAdmin() {
   const { supabase: sb } = await requireAdmin();
   const { t } = await getT();
-  const { data: cats } = await sb.from("categories").select("*, stages(*)").order("sort_order");
+  const { data: cats } = await sb.from("categories").select("*, stages:stages!stages_category_id_fkey(*)").order("sort_order");
   return (
     <div className="space-y-4">
       <h1 className="h1">{t("categories")} / {t("stages")}</h1>

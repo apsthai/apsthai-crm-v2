@@ -13,7 +13,7 @@ export default async function Payouts({ searchParams }: { searchParams: Promise<
   const today = todayBangkok();
 
   let q = sb.from("payouts")
-    .select("id, recipient_type, pay_date, status, total, reviewed_at, staff(codename), partner:partners(name), payout_lines(id, line_type, base_thb, share, amount, note, case:cases(id, student:students(codename), category:categories(name_th, name_en)), rule:payout_rules(revenue_type))")
+    .select("id, recipient_type, pay_date, status, total, reviewed_at, staff:staff!payouts_staff_id_fkey(codename), partner:partners(name), payout_lines(id, line_type, base_thb, share, amount, note, case:cases(id, student:students(codename), category:categories(name_th, name_en)), rule:payout_rules(revenue_type))")
     .order("pay_date", { ascending: false }).limit(200);
   if (!isAdmin) q = q.eq("staff_id", me.id);
   const [{ data: payouts }, { data: schedules }, { data: staff }, { data: partners }] = await Promise.all([

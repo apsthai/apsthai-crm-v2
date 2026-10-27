@@ -22,7 +22,7 @@ export default async function StudentPage({ params }: { params: Promise<{ id: st
     sb.from("contacts").select("*").eq("student_id", id).order("created_at"),
     sb.from("education").select("*, school:schools(name), level:levels(name_th, name_en)").eq("student_id", id).order("academic_year", { ascending: false }).order("start_date", { ascending: false, nullsFirst: false }),
     sb.from("qualifications").select("*").eq("student_id", id).order("date", { ascending: false }),
-    sb.from("cases").select("id, intake, overall_status, applicant, applicant_name, category:categories(name_th, name_en), case_staff(end_date, staff(codename))").eq("student_id", id).order("intake", { ascending: false }),
+    sb.from("cases").select("id, intake, overall_status, applicant, applicant_name, category:categories(name_th, name_en), case_staff(end_date, staff:staff!case_staff_staff_id_fkey(codename))").eq("student_id", id).order("intake", { ascending: false }),
     loadLookups(sb),
     sb.rpc("my_student", { p_student: id }),
   ]);

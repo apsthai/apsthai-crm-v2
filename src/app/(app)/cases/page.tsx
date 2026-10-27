@@ -21,7 +21,7 @@ export default async function Cases({ searchParams }: { searchParams: Promise<{ 
     ids = [...new Set((mine ?? []).map((m: any) => m.case_id as string))];
   }
   let q = sb.from("cases")
-    .select("id, intake, overall_status, next_action, next_action_date, student:students(codename), category:categories(name_th, name_en), case_staff(end_date, staff(codename))")
+    .select("id, intake, overall_status, next_action, next_action_date, student:students(codename), category:categories(name_th, name_en), case_staff(end_date, staff:staff!case_staff_staff_id_fkey(codename))")
     .order("intake", { ascending: true }).limit(300);
   if (ids) q = q.in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
   if (sp.category) q = q.eq("category_id", sp.category);
