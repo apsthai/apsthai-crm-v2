@@ -5,8 +5,6 @@ import nextTs from "eslint-config-next/typescript";
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
-  // Rows come from an untyped Supabase client and are shaped by RLS-checked selects.
-  { rules: { "@typescript-eslint/no-explicit-any": "off" } },
   // Override default ignores of eslint-config-next.
   globalIgnores([
     // Default ignores of eslint-config-next:
