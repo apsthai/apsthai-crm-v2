@@ -196,7 +196,7 @@ function AdminView({ admin, mine, today, cycle }: { admin: Admin; mine: Mine; to
             <tbody>
               {admin.team.map((s) => (
                 <tr key={s.name}>
-                  <td className="border-b border-slate-100 px-3 py-2.5 font-medium">{s.name}{s.partTime && <span className="ml-2 text-xs font-normal text-slate-500">Part-time</span>}</td>
+                  <td className="border-b border-slate-100 px-3 py-2.5 font-medium whitespace-nowrap">{s.name}{s.partTime && <span className="ml-2 text-xs font-normal whitespace-nowrap text-slate-500">Part-time</span>}</td>
                   <td className="border-b border-slate-100 px-3 py-2.5 text-right">{s.active}</td>
                   <td className="border-b border-slate-100 px-3 py-2.5 text-right">{s.today}</td>
                   <td className={`border-b border-slate-100 px-3 py-2.5 text-right ${s.overdue ? "font-semibold text-brand-red" : ""}`}>{s.overdue}</td>

@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { addDays, addMonths, daysBetween, monthStart } from "@/lib/dates";
+import { addDays, addMonths, daysBetween, fmtMonth, monthStart } from "@/lib/dates";
 import { toTHB } from "@/lib/money";
 
 type Cycle = { start: string; end: string; label: string };
@@ -36,7 +36,7 @@ export async function loadTasks(sb: SupabaseClient, staffId: string, today: stri
   const all: TaskRow[] = rows.map((r) => ({
     id: r.id, title: r.title, due: r.due_date, lateDays: daysBetween(r.due_date, today),
     caseId: r.case.id, student: r.case.student.codename,
-    service: `${r.case.category.name_en} · ${r.case.intake.slice(0, 7)}`, stage: stage.get(r.case.id) ?? "Not started",
+    service: `${r.case.category.name_en} · ${fmtMonth(r.case.intake)}`, stage: stage.get(r.case.id) ?? "Not started",
   }));
   return {
     now: all.filter((t) => t.due <= today),
