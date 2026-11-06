@@ -112,7 +112,7 @@ function AdminView({ admin, mine, today, cycle }: { admin: Admin; mine: Mine; to
     <>
       {admin.missingRate && (
         <p role="alert" className="rounded-lg bg-red-50 px-4 py-3 text-sm text-brand-red">
-          Some amounts are in a currency with no exchange rate yet, so they count as ฿0 below. Add the rate in Settings.
+          Some amounts are in a currency with no exchange rate yet, so they count as ฿0 below.
         </p>
       )}
 

@@ -25,6 +25,7 @@ export function StageChip({ caseId, applicationId, stageId, name, state, note, s
   success: boolean; canEdit: boolean; big?: boolean; today: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [alignRight, setAlignRight] = useState(false);
   const box = useRef<HTMLDivElement>(null);
   const look = LOOK[state];
 
@@ -44,12 +45,18 @@ export function StageChip({ caseId, applicationId, stageId, name, state, note, s
 
   return (
     <div ref={box} className="relative">
-      <button type="button" disabled={!canEdit} onClick={() => setOpen(!open)} aria-expanded={open}
+      <button type="button" disabled={!canEdit} aria-expanded={open}
+        onClick={() => {
+          // Open the box towards the side with room, so it never runs off the screen.
+          const r = box.current?.getBoundingClientRect();
+          if (r) setAlignRight(r.left + 288 > window.innerWidth - 16);
+          setOpen(!open);
+        }}
         title={`${name}: ${look.label}`} className={`${cls} ${canEdit ? "cursor-pointer hover:brightness-95" : "cursor-default"}`}>
         {big ? (<><span className="text-sm font-semibold">{label}</span><span className="text-xs opacity-85">{note ?? look.label}</span></>) : label}
       </button>
       {open && (
-        <form action={updateStage} className="absolute top-full left-0 z-20 mt-2 flex w-72 flex-col gap-2.5 rounded-xl border border-slate-200 bg-white p-4 text-slate-800 shadow-lg">
+        <form action={updateStage} className={`absolute top-full z-20 mt-2 flex w-72 max-w-[calc(100vw-2rem)] ${alignRight ? "right-0" : "left-0"} flex-col gap-2.5 rounded-xl border border-slate-200 bg-white p-4 text-slate-800 shadow-lg`}>
           <input type="hidden" name="case_id" value={caseId} />
           <input type="hidden" name="stage_id" value={stageId} />
           {applicationId && <input type="hidden" name="application_id" value={applicationId} />}

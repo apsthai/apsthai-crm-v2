@@ -43,7 +43,7 @@ export default async function CasePage({ params, searchParams }: {
     sb.from("case_staff").select("id, staff_id, start_date, end_date, created_at").eq("case_id", id).order("start_date"),
     sb.from("stages").select("id, name_en, sort_order, level, milestone, editable_by_team_id").eq("category_id", kase.category_id).eq("active", true).order("sort_order"),
     sb.from("v_stage_latest").select("application_id, stage_id, status, date, approval").eq("case_id", id),
-    sb.from("applications").select("id, commissionable_fee, currency, expected_income, result, product:products(school:schools(name, type), partner:partners(name))").eq("case_id", id).order("created_at"),
+    sb.from("applications").select("id, commissionable_fee, currency, expected_income, result, created_at, created_by, product:products(school:schools(name, type), partner:partners(name))").eq("case_id", id).order("created_at"),
     sb.from("tasks").select("id, title, due_date, assigned_to, done_at, done_by, created_at, created_by").eq("case_id", id).order("due_date"),
     sb.from("v_case_progress").select("probability_pct").eq("case_id", id).maybeSingle(),
     sb.from("v_cashflow").select("amount_thb").eq("kind", "weighted").eq("case_id", id),
@@ -58,11 +58,15 @@ export default async function CasePage({ params, searchParams }: {
     sb.from("contacts").select("relation, type, value").eq("student_id", kase.student.id).eq("active", true).limit(2),
   ]);
 
-  type App = { id: string; commissionable_fee: number | null; currency: string; expected_income: number | null; result: string;
+  type App = { id: string; commissionable_fee: number | null; currency: string; expected_income: number | null; result: string; created_at: string; created_by: string | null;
     product: { school: { name: string; type: string } | null; partner: { name: string } | null } };
   const appRows = (apps.data ?? []) as unknown as App[];
   const appName = (a: App | undefined) => a?.product.school?.name ?? a?.product.partner?.name ?? "School";
   const appIds = appRows.map((a) => a.id);
+  // Result changes are only in the change log (admin and the case's staff can read it).
+  const { data: resultLog } = appIds.length
+    ? await sb.from("change_log").select("row_id, new_value, changed_at, changed_by").eq("table_name", "applications").eq("field", "result").in("row_id", appIds)
+    : { data: [] };
   const { data: fb } = appIds.length
     ? await sb.from("feedback").select("id, application_id, date, feedback, action, created_at, created_by").in("application_id", appIds).order("date", { ascending: false })
     : { data: [] };
@@ -114,6 +118,9 @@ export default async function CasePage({ params, searchParams }: {
   const history = [
     ...((stageLog.data ?? []) as { id: string; application_id: string | null; stage_id: string; status: string; approval: string; remark: string | null; created_at: string; created_by: string | null }[])
       .map((u) => ({ at: u.created_at, by: u.created_by, what: `${u.application_id ? `${appName(appById.get(u.application_id))}: ` : ""}${stageName.get(u.stage_id) ?? "Stage"} ${STATUS_WORD[u.status] ?? u.status}${u.approval === "pending" ? " (waiting for approval)" : u.approval === "approved" ? " (approved)" : ""}${u.remark ? ` · ${u.remark}` : ""}` })),
+    ...appRows.map((a) => ({ at: a.created_at, by: a.created_by, what: `School added: ${appName(a)}` })),
+    ...((resultLog ?? []) as { row_id: string; new_value: string; changed_at: string; changed_by: string | null }[])
+      .map((r) => ({ at: r.changed_at, by: r.changed_by, what: `${appName(appById.get(r.row_id))}: result ${r.new_value.replace("_", " ")}` })),
     ...taskRows.map((t) => ({ at: t.created_at, by: t.created_by, what: `Task added: ${t.title}` })),
     ...doneTasks.map((t) => ({ at: t.done_at!, by: t.done_by, what: `Task done: ${t.title}` })),
     ...fbRows.map((f) => ({ at: f.created_at, by: f.created_by, what: `Feedback on ${appName(appById.get(f.application_id))}: ${f.feedback}` })),
@@ -180,7 +187,7 @@ export default async function CasePage({ params, searchParams }: {
           )}
 
           {appStages.length > 0 && (
-            <Card title="Schools applied to" sub={open ? "Each school moves through its own stages. Click a stage to update it." : undefined}>
+            <Card title="Schools applied to" sub={canEdit ? "Each school moves through its own stages. Click a stage to update it." : undefined}>
               <div className="flex flex-col gap-3.5">
                 {appRows.length === 0 && <p className="text-sm text-slate-400">No school yet.</p>}
                 {appRows.map((a) => {
