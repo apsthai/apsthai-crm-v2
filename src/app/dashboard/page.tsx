@@ -185,7 +185,7 @@ function AdminView({ admin, mine, today, cycle }: { admin: Admin; mine: Mine; to
 
       <Card title={`Team performance, ${cycle}`} right={`Team total: ${fmtPoints(admin.teamPoints)} points`}>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[820px] border-collapse text-sm">
+          <table className="w-full min-w-[820px] border-collapse text-sm whitespace-nowrap">
             <thead>
               <tr className="text-left text-xs tracking-wide text-slate-500 uppercase">
                 {["Staff", "Active cases", "Due today", "Overdue", "Successful", "Points / KPI", "To go", "Pipeline × probability"].map((h, i) => (
