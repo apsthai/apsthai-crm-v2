@@ -1,1 +1,13 @@
 @import "tailwindcss";
+
+@theme {
+  --color-navy: #0f4e79;
+  --color-navy-dark: #0b3a5b;
+  --color-navy-50: #eef4f9;
+  --color-brand-red: #d6192d;
+  --font-sans: "IBM Plex Sans Thai", ui-sans-serif, system-ui, sans-serif;
+}
+
+body {
+  @apply bg-slate-100 text-slate-800 antialiased;
+}
