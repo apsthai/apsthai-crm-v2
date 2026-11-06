@@ -11,3 +11,8 @@
 body {
   @apply bg-slate-100 text-slate-800 antialiased;
 }
+
+@keyframes loading {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(300%); }
+}

@@ -1,0 +1,131 @@
+"use server";
+
+import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
+import { getMe } from "@/lib/auth";
+import { todayBangkok } from "@/lib/dates";
+
+const s = (fd: FormData, k: string) => {
+  const v = String(fd.get(k) ?? "").trim();
+  return v === "" ? null : v;
+};
+const n = (fd: FormData, k: string) => {
+  const v = s(fd, k);
+  return v === null ? null : Number(v.replace(/,/g, ""));
+};
+
+type Res = { data: unknown[] | null; error: { message: string } | null };
+const changed = (r: Res) => r.error ?? (r.data && r.data.length ? null : "You are not allowed to change this");
+
+// Every action ends here: back to the case with a message.
+function back(caseId: string, error?: { message: string } | null | string) {
+  revalidatePath(`/cases/${caseId}`);
+  const msg = typeof error === "string" ? error : error?.message;
+  redirect(`/cases/${caseId}?${msg ? `err=${encodeURIComponent(msg)}` : "ok=1"}`);
+}
+
+export async function updateStage(fd: FormData) {
+  const { supabase } = await getMe();
+  const caseId = s(fd, "case_id")!;
+  const status = s(fd, "status");
+  if (!status) return back(caseId, "Choose a status");
+  const { error } = await supabase.from("stage_updates").insert({
+    case_id: caseId, application_id: s(fd, "application_id"), stage_id: s(fd, "stage_id"),
+    status, date: s(fd, "date") ?? todayBangkok(), remark: s(fd, "remark"),
+  });
+  back(caseId, error);
+}
+
+export async function addApplication(fd: FormData) {
+  const { supabase } = await getMe();
+  const caseId = s(fd, "case_id")!;
+  if (!s(fd, "product_id")) return back(caseId, "Choose a school");
+  const { error } = await supabase.from("applications").insert({
+    case_id: caseId, product_id: s(fd, "product_id"), commissionable_fee: n(fd, "fee"), currency: s(fd, "currency") ?? "GBP",
+  });
+  back(caseId, error);
+}
+
+export async function setResult(fd: FormData) {
+  const { supabase } = await getMe();
+  const caseId = s(fd, "case_id")!;
+  const r = await supabase.from("applications").update({ result: s(fd, "result") }).eq("id", s(fd, "application_id")!).select("id");
+  back(caseId, changed(r));
+}
+
+export async function addFeedback(fd: FormData) {
+  const { supabase } = await getMe();
+  const caseId = s(fd, "case_id")!;
+  if (!s(fd, "feedback")) return back(caseId, "Write the feedback first");
+  const { error } = await supabase.from("feedback").insert({
+    application_id: s(fd, "application_id"), date: s(fd, "date") ?? todayBangkok(), feedback: s(fd, "feedback"), action: s(fd, "action"),
+  });
+  back(caseId, error);
+}
+
+export async function addTask(fd: FormData) {
+  const { supabase } = await getMe();
+  const caseId = s(fd, "case_id")!;
+  if (!s(fd, "title")) return back(caseId, "Write what needs to be done");
+  const { error } = await supabase.from("tasks").insert({
+    case_id: caseId, title: s(fd, "title"), due_date: s(fd, "due_date") ?? todayBangkok(), assigned_to: s(fd, "assigned_to"),
+  });
+  back(caseId, error);
+}
+
+export async function toggleTask(fd: FormData) {
+  const { supabase } = await getMe();
+  const caseId = s(fd, "case_id")!;
+  const done = s(fd, "done") === "1";
+  const r = await supabase.from("tasks").update({ done_at: done ? new Date().toISOString() : null }).eq("id", s(fd, "task_id")!).select("id");
+  back(caseId, changed(r));
+}
+
+export async function updateCase(fd: FormData) {
+  const { supabase } = await getMe();
+  const caseId = s(fd, "case_id")!;
+  const intake = s(fd, "intake");
+  const subAgent = s(fd, "sub_agent_id");
+  const { data, error } = await supabase.from("cases").update({
+    intake: intake ? `${intake}-01` : undefined,
+    lead_channel_id: s(fd, "lead_channel_id"),
+    applicant: s(fd, "applicant") ?? "student",
+    applicant_name: s(fd, "applicant_name"),
+    referred_by: s(fd, "referred_by"),
+    sub_agent_id: subAgent,
+    sub_agent_pct: subAgent ? n(fd, "sub_agent_pct") : null,
+  }).eq("id", caseId).select("id");
+  back(caseId, changed({ data, error }));
+}
+
+export async function addStaff(fd: FormData) {
+  const { supabase } = await getMe();
+  const caseId = s(fd, "case_id")!;
+  if (!s(fd, "staff_id")) return back(caseId, "Choose a person");
+  const { error } = await supabase.from("case_staff").insert({ case_id: caseId, staff_id: s(fd, "staff_id") });
+  back(caseId, error);
+}
+
+export async function endStaff(fd: FormData) {
+  const { supabase } = await getMe();
+  const caseId = s(fd, "case_id")!;
+  const r = await supabase.from("case_staff").update({ end_date: todayBangkok() }).eq("id", s(fd, "link_id")!).select("id");
+  back(caseId, changed(r));
+}
+
+export async function closeLost(fd: FormData) {
+  const { supabase } = await getMe();
+  const caseId = s(fd, "case_id")!;
+  const reason = s(fd, "reason");
+  if (!reason) return back(caseId, "Write why the case was lost");
+  const r = await supabase.from("cases").update({ overall_status: "fail", overall_remark: reason }).eq("id", caseId).select("id");
+  back(caseId, changed(r));
+}
+
+// Admin only (RLS and the status guard allow it): undo a "lost" by mistake.
+export async function reopenCase(fd: FormData) {
+  const { supabase } = await getMe();
+  const caseId = s(fd, "case_id")!;
+  const r = await supabase.from("cases").update({ overall_status: "in_progress", overall_remark: null }).eq("id", caseId).select("id");
+  back(caseId, changed(r));
+}

@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 
-const NAV = [{ href: "/dashboard", label: "Dashboard" }];
+const NAV = [{ href: "/dashboard", label: "Dashboard" }, { href: "/cases", label: "Cases" }];
 
 export function AppShell({ name, active, children }: { name: string; active: string; children: React.ReactNode }) {
   return (
@@ -14,7 +14,7 @@ export function AppShell({ name, active, children }: { name: string; active: str
           <nav className="flex flex-1 flex-wrap gap-1 text-sm">
             {NAV.map((n) => (
               <Link key={n.href} href={n.href}
-                className={n.href === active
+                className={active.startsWith(n.href)
                   ? "rounded-lg bg-navy-50 px-3 py-2 font-semibold text-navy"
                   : "rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-50 hover:text-navy"}>
                 {n.label}
