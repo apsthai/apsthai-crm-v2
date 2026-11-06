@@ -1,7 +1,7 @@
 import { AppShell, Bar, Card, SectionLabel, Tile } from "@/components/app-shell";
 import { getMe } from "@/lib/auth";
 import { cycleOf, fmtDate, fmtLongDate, fmtMonth, fmtMonthShort, hourBangkok, todayBangkok } from "@/lib/dates";
-import { fmtPoints, fmtTHB, fmtTHBShort } from "@/lib/money";
+import { fmtPoints, fmtTHB, fmtTHBShort, incomeOf, vatOf } from "@/lib/money";
 import { loadAdmin, loadCompany, loadMine, type TaskRow } from "./data";
 
 export default async function Dashboard() {
@@ -122,27 +122,34 @@ function AdminView({ admin, mine, today, cycle }: { admin: Admin; mine: Mine; to
           <Tile label="Success waiting for approval" value={String(a.approvals)} tone="navy"
             sub={a.approvals ? a.approvalServices.join(", ") : "Nothing waiting"} />
           <Tile label="Overdue money from payers" value={String(a.overdueCount)} tone={a.overdueCount ? "red" : "ink"}
-            sub={a.overdueCount ? `${fmtTHB(a.overdueTHB)} past the expected date` : "Nothing overdue"} />
+            sub={a.overdueCount ? `${fmtTHB(a.overdueTHB)} incl. VAT, past the expected date` : "Nothing overdue"} />
           <Tile label="Next payout round" value={a.payout ? fmtTHB(a.payout.total) : "None"}
-            sub={a.payout ? `Pay ${fmtDate(a.payout.date)} · ${a.payout.people} payees · ${a.payout.reviewed} reviewed` : "No payout waiting"} />
+            sub={a.payout ? `Commission, no VAT · pay ${fmtDate(a.payout.date)} · ${a.payout.people} payees · ${a.payout.reviewed} reviewed` : "No payout waiting"} />
           <Tile label="Active cases with no open task" value={String(a.noTask)} tone={a.noTask ? "red" : "ink"}
             sub="Nothing scheduled to do next" />
         </div>
       </section>
 
       <section className="flex flex-col gap-3">
-        <SectionLabel>Money (THB)</SectionLabel>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <SectionLabel>Money (THB)</SectionLabel>
+          <span className="text-[13px] text-slate-500">Big numbers include 7% VAT. Income is what is left after VAT.</span>
+        </div>
         <div className="flex flex-wrap gap-3">
-          <Tile label="Received this month" value={fmtTHB(admin.money.receivedMonth)} sub={`${fmtMonth(today)}, before VAT`} />
-          <Tile label={`Received ${cycle}`} value={fmtTHB(admin.money.receivedCycle)} sub="So far, before VAT" />
-          <Tile label="Due in the next 60 days" value={fmtTHB(admin.money.next60)} sub="Confirmed, as billed" />
-          <Tile label={`Still to come ${cycle}`} value={fmtTHB(admin.money.owedInCycle + admin.money.weightedInCycle)}
-            sub={`${fmtTHBShort(admin.money.owedInCycle)} confirmed + ${fmtTHBShort(admin.money.weightedInCycle)} pipeline`} />
+          <MoneyTile label="Received this month" gross={admin.money.receivedMonth.gross} vat={admin.money.receivedMonth.vat}
+            income={admin.money.receivedMonth.income} wht={admin.money.receivedMonth.wht} note={fmtMonth(today)} />
+          <MoneyTile label={`Received ${cycle}`} gross={admin.money.receivedCycle.gross} vat={admin.money.receivedCycle.vat}
+            income={admin.money.receivedCycle.income} wht={admin.money.receivedCycle.wht} note="So far" />
+          <MoneyTile label="Due in the next 60 days" gross={admin.money.next60} vat={vatOf(admin.money.next60)}
+            income={incomeOf(admin.money.next60)} note="Confirmed, not paid yet" />
+          <MoneyTile label={`Still to come ${cycle}`} gross={admin.money.owedInCycle + admin.money.weightedInCycle}
+            vat={vatOf(admin.money.owedInCycle + admin.money.weightedInCycle)} income={incomeOf(admin.money.owedInCycle + admin.money.weightedInCycle)}
+            note={`${fmtTHBShort(admin.money.owedInCycle)} confirmed + ${fmtTHBShort(admin.money.weightedInCycle)} pipeline`} />
         </div>
       </section>
 
       <div className="flex flex-wrap items-stretch gap-6">
-        <Card title="Forecast, next 6 months" className="flex-[3_1_520px]"
+        <Card title="Forecast, next 6 months" sub="Incl. VAT" className="flex-[3_1_520px]"
           right={<span className="flex gap-4 text-slate-600">
             <span className="flex items-center gap-1.5"><span className="size-3 rounded-sm bg-navy" />Confirmed</span>
             <span className="flex items-center gap-1.5"><span className="size-3 rounded-sm bg-[#9dbbd3]" />Pipeline × probability</span>
@@ -166,7 +173,7 @@ function AdminView({ admin, mine, today, cycle }: { admin: Admin; mine: Mine; to
           </div>
         </Card>
 
-        <Card title="Pipeline by service" sub="Active cases, value × probability" className="flex-[2_1_340px]">
+        <Card title="Pipeline by service" sub="Active cases, value × probability, incl. VAT" className="flex-[2_1_340px]">
           {admin.pipeline.length === 0 ? <Empty text="No active cases yet." /> : (
             <div className="flex flex-col gap-3">
               {admin.pipeline.map((p) => (
@@ -188,7 +195,7 @@ function AdminView({ admin, mine, today, cycle }: { admin: Admin; mine: Mine; to
           <table className="w-full min-w-[820px] border-collapse text-sm whitespace-nowrap">
             <thead>
               <tr className="text-left text-xs tracking-wide text-slate-500 uppercase">
-                {["Staff", "Active cases", "Due today", "Overdue", "Successful", "Points / KPI", "To go", "Pipeline × probability"].map((h, i) => (
+                {["Staff", "Active cases", "Due today", "Overdue", "Successful", "Points / KPI", "To go", "Pipeline × probability (incl. VAT)"].map((h, i) => (
                   <th key={h} className={`border-b border-slate-200 px-3 py-2.5 font-semibold ${i ? "text-right" : ""}`}>{h}</th>
                 ))}
               </tr>
@@ -218,6 +225,22 @@ function AdminView({ admin, mine, today, cycle }: { admin: Admin; mine: Mine; to
 
       <Waiting mine={mine} />
     </>
+  );
+}
+
+function MoneyTile({ label, gross, vat, income, wht, note }:
+  { label: string; gross: number; vat: number; income: number; wht?: number; note: string }) {
+  return (
+    <div className="flex min-w-0 flex-[1_1_220px] flex-col gap-1 rounded-xl border border-slate-200 bg-white px-[18px] py-4">
+      <span className="text-[13px] text-slate-500">{label}</span>
+      <span className="text-[26px] leading-tight font-semibold text-slate-900">{fmtTHB(gross)} <span className="text-xs font-normal text-slate-500">incl. VAT</span></span>
+      <div className="mt-1 flex flex-col gap-0.5 border-t border-slate-100 pt-2 text-[13px]">
+        <div className="flex justify-between text-slate-500"><span>VAT 7%</span><span>{fmtTHB(vat)}</span></div>
+        {wht ? <div className="flex justify-between text-slate-500"><span>Withheld tax (in the total)</span><span>{fmtTHB(wht)}</span></div> : null}
+        <div className="flex justify-between font-semibold text-navy"><span>Income (no VAT)</span><span>{fmtTHB(income)}</span></div>
+      </div>
+      <span className="text-[13px] text-slate-500">{note}</span>
+    </div>
   );
 }
 

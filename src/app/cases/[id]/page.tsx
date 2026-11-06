@@ -200,7 +200,7 @@ export default async function CasePage({ params, searchParams }: {
                           <div className="text-[15px] font-semibold">{appName(a)}</div>
                           {canMoney && (
                             <div className="text-[13px] text-slate-500">
-                              Fee {money(a.commissionable_fee, a.currency)} · expected income {money(a.expected_income, a.currency)}
+                              Fee {money(a.commissionable_fee, a.currency)} · expected income {money(a.expected_income, a.currency)} incl. VAT
                             </div>
                           )}
                         </div>
@@ -388,13 +388,13 @@ export default async function CasePage({ params, searchParams }: {
           </Card>
 
           {canMoney && (
-            <Card title="Money" sub={(recv ?? []).length ? "Amounts to collect for this case" : "Estimate until the student enrols. Amounts to collect are created then."}>
+            <Card title="Money" sub={(recv ?? []).length ? "Amounts to collect for this case, incl. VAT" : "Estimate incl. VAT until the student enrols. Amounts to collect are created then."}>
               {(recv ?? []).length === 0 ? (
                 <>
                   {appRows.filter((a) => a.expected_income !== null && !["rejected", "withdrawn"].includes(a.result)).map((a) => (
                     <div key={a.id} className="flex justify-between border-b border-slate-100 py-2 text-sm"><span>{appName(a)}</span><span>{money(a.expected_income, a.currency)}</span></div>
                   ))}
-                  <div className="flex justify-between pt-2.5 text-sm font-semibold"><span>Expected × chance</span><span>{fmtTHB(weightedTHB)}</span></div>
+                  <div className="flex justify-between pt-2.5 text-sm font-semibold"><span>Expected × chance, incl. VAT</span><span>{fmtTHB(weightedTHB)}</span></div>
                 </>
               ) : (
                 ((recv ?? []) as unknown as { id: string; type: string; payer_name: string | null; amount: number; currency: string; expected_date: string; status: string; school: { name: string } | null; partner: { name: string } | null; payment_lines: { amount: number }[] }[]).map((r) => (

@@ -15,3 +15,7 @@ export function toTHB(amount: number, currency: string, rates: Map<string, numbe
   const r = rates.get(currency);
   return { thb: r ? amount * r : 0, missing: !r };
 }
+
+// Every amount we bill includes 7% VAT. Income is what is left after taking the VAT out.
+export const vatOf = (gross: number) => (gross * 7) / 107;
+export const incomeOf = (gross: number) => gross - vatOf(gross);

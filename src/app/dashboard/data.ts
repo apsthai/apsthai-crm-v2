@@ -107,7 +107,7 @@ export async function loadAdmin(sb: SupabaseClient, today: string, cycle: Cycle)
   const [rates, recv, pays, weighted, cats, payouts, pending, cases, openTasks, staff, links, pts, kpis] = await Promise.all([
     sb.from("v_latest_rate").select("currency, rate_thb"),
     sb.from("receivables").select("amount, currency, expected_date, payment_lines(amount)").in("status", OPEN_RECEIVABLE),
-    sb.from("payments").select("received_date, revenue_ex_vat").gte("received_date", cycle.start).lte("received_date", cycle.end),
+    sb.from("payments").select("received_date, received_thb, vat_thb, wht_thb, revenue_ex_vat").gte("received_date", cycle.start).lte("received_date", cycle.end),
     sb.from("v_cashflow").select("month, category_id, amount_thb, case_id, missing_rate").eq("kind", "weighted"),
     sb.from("categories").select("id, name_en, sort_order"),
     sb.from("payouts").select("pay_date, total, status").in("status", ["draft", "reviewed"]).order("pay_date"),
@@ -136,7 +136,14 @@ export async function loadAdmin(sb: SupabaseClient, today: string, cycle: Cycle)
   const next60 = owed.filter((r) => r.due >= today && r.due <= addDays(today, 60));
   const owedInCycle = owed.filter((r) => r.due <= cycle.end).reduce((a, r) => a + r.thb, 0);
 
-  const received = (pays.data ?? []) as { received_date: string; revenue_ex_vat: number }[];
+  const received = (pays.data ?? []) as { received_date: string; received_thb: number; vat_thb: number; wht_thb: number; revenue_ex_vat: number }[];
+  // Received money split into what the payer paid (incl. VAT, before their withholding tax), the VAT and our real income.
+  const sumPaid = (rows: typeof received) => ({
+    gross: rows.reduce((a, p) => a + Number(p.received_thb) + Number(p.wht_thb), 0),
+    vat: rows.reduce((a, p) => a + Number(p.vat_thb), 0),
+    wht: rows.reduce((a, p) => a + Number(p.wht_thb), 0),
+    income: rows.reduce((a, p) => a + Number(p.revenue_ex_vat), 0),
+  });
   const thisMonth = monthStart(today);
 
   const w = (weighted.data ?? []) as { month: string; category_id: string; amount_thb: number; case_id: string; missing_rate: boolean }[];
@@ -217,8 +224,8 @@ export async function loadAdmin(sb: SupabaseClient, today: string, cycle: Cycle)
       noTask,
     },
     money: {
-      receivedMonth: received.filter((p) => p.received_date >= thisMonth).reduce((a, p) => a + Number(p.revenue_ex_vat), 0),
-      receivedCycle: received.reduce((a, p) => a + Number(p.revenue_ex_vat), 0),
+      receivedMonth: sumPaid(received.filter((p) => p.received_date >= thisMonth)),
+      receivedCycle: sumPaid(received),
       next60: next60.reduce((a, r) => a + r.thb, 0),
       owedInCycle, weightedInCycle,
     },
