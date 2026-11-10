@@ -4,7 +4,7 @@ import { inputCls } from "@/components/fields";
 import { getMe } from "@/lib/auth";
 import { daysBetween, fmtDate, fmtMonth, todayBangkok } from "@/lib/dates";
 
-type Params = { scope?: string; status?: string; service?: string; intake?: string; q?: string };
+type Params = { scope?: string; status?: string; service?: string; intake?: string; q?: string; sort?: string; dir?: string };
 const STATUS: Record<string, string[]> = {
   active: ["not_started", "in_progress"], success: ["success"], fail: ["fail"],
 };
@@ -48,10 +48,23 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
   const nextTask = new Map<string, { title: string; due_date: string }>();
   for (const t of (taskRes.data ?? []) as { case_id: string; title: string; due_date: string }[]) if (!nextTask.has(t.case_id)) nextTask.set(t.case_id, t);
 
-  // No open task first, then the earliest due task.
+  // Default: no open task first, then the earliest due task. A column header click sorts by that column.
+  const staffOf = (r: Row) => r.case_staff.filter((x) => !x.end_date).map((x) => x.staff.codename).join(", ");
+  const KEYS: Record<string, (r: Row) => string | number> = {
+    student: (r) => r.student.codename.toLowerCase(),
+    service: (r) => r.category.name_en,
+    intake: (r) => r.intake,
+    stage: (r) => prog.get(r.id)?.furthest_stage_en ?? "",
+    chance: (r) => Number(prog.get(r.id)?.probability_pct ?? 0),
+    staff: (r) => staffOf(r) || "~",
+    task: (r) => nextTask.get(r.id)?.due_date ?? "0000",
+  };
+  const sort = sp.sort && KEYS[sp.sort] ? sp.sort : "task";
+  const dir = sp.dir === "desc" ? -1 : 1;
   rows.sort((a, b) => {
-    const ta = nextTask.get(a.id)?.due_date ?? "0000", tb = nextTask.get(b.id)?.due_date ?? "0000";
-    return ta.localeCompare(tb) || a.student.codename.localeCompare(b.student.codename);
+    const x = KEYS[sort](a), y = KEYS[sort](b);
+    const c = typeof x === "number" && typeof y === "number" ? x - y : String(x).localeCompare(String(y));
+    return c * dir || a.student.codename.localeCompare(b.student.codename);
   });
 
   const link = (over: Params) => {
@@ -77,6 +90,8 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
         <form className="flex flex-[1_1_420px] flex-wrap gap-2" action="/cases">
           <input type="hidden" name="scope" value={scope} />
           <input type="hidden" name="status" value={status} />
+          {sp.sort && <input type="hidden" name="sort" value={sp.sort} />}
+          {sp.dir && <input type="hidden" name="dir" value={sp.dir} />}
           <input name="q" defaultValue={sp.q ?? ""} placeholder="Search student name" aria-label="Search student name" className={`${inputCls} flex-[1_1_200px] !w-auto`} />
           <select name="service" defaultValue={sp.service ?? ""} aria-label="Service" className={`${inputCls} !w-auto`}>
             <option value="">All services</option>
@@ -94,9 +109,18 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
         <table className="w-full min-w-[900px] border-collapse text-sm whitespace-nowrap">
           <thead>
             <tr className="text-left text-xs tracking-wide text-slate-500 uppercase">
-              {["Student", "Service", "Intake", "Stage", "Chance", "Staff", "Next task"].map((h) => (
-                <th key={h} className={`border-b border-slate-200 px-4 py-3 font-semibold ${h === "Chance" ? "text-right" : ""}`}>{h}</th>
-              ))}
+              {[["student", "Student"], ["service", "Service"], ["intake", "Intake"], ["stage", "Stage"], ["chance", "Chance"], ["staff", "Staff"], ["task", "Next task"]].map(([k, h]) => {
+                const on = sort === k;
+                const next = on && dir === 1 ? "desc" : "asc";
+                return (
+                  <th key={k} aria-sort={on ? (dir === 1 ? "ascending" : "descending") : "none"}
+                    className={`border-b border-slate-200 px-4 py-3 font-semibold ${k === "chance" ? "text-right" : ""}`}>
+                    <Link href={link({ sort: k, dir: next })} className={`inline-flex items-center gap-1 hover:text-navy ${on ? "text-navy" : ""}`}>
+                      {h}<span aria-hidden="true" className={on ? "" : "opacity-30"}>{on ? (dir === 1 ? "▲" : "▼") : "▲"}</span>
+                    </Link>
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
@@ -126,7 +150,7 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
           </tbody>
         </table>
       </section>
-      <p className="text-[13px] text-slate-500">Cases with no open task come first, then by the next task date, so nothing gets forgotten.</p>
+      <p className="text-[13px] text-slate-500">Click a column name to sort. By default, cases with no open task come first, then by the next task date.</p>
     </AppShell>
   );
 }

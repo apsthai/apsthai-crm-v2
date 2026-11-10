@@ -41,7 +41,7 @@ export async function addApplication(fd: FormData) {
   const caseId = s(fd, "case_id")!;
   if (!s(fd, "product_id")) return back(caseId, "Choose a school");
   const { error } = await supabase.from("applications").insert({
-    case_id: caseId, product_id: s(fd, "product_id"), commissionable_fee: n(fd, "fee"), currency: s(fd, "currency") ?? "GBP",
+    case_id: caseId, product_id: s(fd, "product_id"), programme: s(fd, "programme"), commissionable_fee: n(fd, "fee"), currency: s(fd, "currency") ?? "GBP",
   });
   back(caseId, error);
 }
@@ -127,5 +127,14 @@ export async function reopenCase(fd: FormData) {
   const { supabase } = await getMe();
   const caseId = s(fd, "case_id")!;
   const r = await supabase.from("cases").update({ overall_status: "in_progress", overall_remark: null }).eq("id", caseId).select("id");
+  back(caseId, changed(r));
+}
+
+export async function updateApplication(fd: FormData) {
+  const { supabase } = await getMe();
+  const caseId = s(fd, "case_id")!;
+  const r = await supabase.from("applications").update({
+    programme: s(fd, "programme"), commissionable_fee: n(fd, "fee"), currency: s(fd, "currency") ?? "GBP",
+  }).eq("id", s(fd, "application_id")!).select("id");
   back(caseId, changed(r));
 }

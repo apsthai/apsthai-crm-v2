@@ -7,7 +7,7 @@ import { Submit } from "@/components/submit";
 import { getMe } from "@/lib/auth";
 import { daysBetween, fmtDate, fmtMonth, todayBangkok } from "@/lib/dates";
 import { fmtTHB } from "@/lib/money";
-import { addApplication, addFeedback, addStaff, addTask, closeLost, endStaff, reopenCase, setResult, toggleTask, updateCase } from "./actions";
+import { addApplication, addFeedback, updateApplication, addStaff, addTask, closeLost, endStaff, reopenCase, setResult, toggleTask, updateCase } from "./actions";
 import { type ChipState, StageChip } from "./stage-chip";
 
 const CURRENCIES = ["GBP", "THB", "USD", "EUR", "AUD", "NZD", "CAD", "SGD", "CHF"];
@@ -77,7 +77,7 @@ export default async function CasePage({ params, searchParams }: {
   const onCase = current.some((l) => l.staff_id === me.id);
   const everOnCase = linkRows.some((l) => l.staff_id === me.id);
   const open = ["not_started", "in_progress"].includes(kase.overall_status);
-  const canEdit = open && (isAdmin || onCase);
+  const canEdit = isAdmin || (open && onCase); // admin can also fix closed cases
   const canMoney = isAdmin || everOnCase;
   const myTeams = new Set((teams.data ?? []).map((t) => t.team_id as string));
 
@@ -150,7 +150,7 @@ export default async function CasePage({ params, searchParams }: {
             <span className="text-slate-500">Staff: {current.map((l) => who.get(l.staff_id)).join(", ") || "nobody yet"}</span>
           </div>
         </div>
-        {canEdit && (
+        {canEdit && open && (
           <details className="group relative">
             <summary className="cursor-pointer list-none rounded-lg border border-red-300 bg-white px-3.5 py-2 text-sm text-brand-red hover:bg-red-50">Close as lost</summary>
             <form action={closeLost} className="absolute right-0 z-20 mt-2 flex w-80 flex-col gap-2.5 rounded-xl border border-slate-200 bg-white p-4 shadow-lg">
@@ -166,6 +166,12 @@ export default async function CasePage({ params, searchParams }: {
           <form action={reopenCase}><input type="hidden" name="case_id" value={id} /><Submit variant="ghost">Reopen case</Submit></form>
         )}
       </div>
+
+      {!open && isAdmin && (
+        <p className="rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          This case is closed. Only admin can edit it. Stages stay locked. Changing staff on a successful case splits its points again among the new staff.
+        </p>
+      )}
 
       {kase.overall_status === "fail" && (
         <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-brand-red">Lost on {fmtDate(kase.closed_date)}: {kase.overall_remark}</p>
@@ -187,7 +193,7 @@ export default async function CasePage({ params, searchParams }: {
           )}
 
           {appStages.length > 0 && (
-            <Card title="Schools applied to" sub={canEdit ? "Each school moves through its own stages. Click a stage to update it." : undefined}>
+            <Card title="Schools applied to" sub={canEdit && open ? "Each school moves through its own stages. Click a stage to update it." : undefined}>
               <div className="flex flex-col gap-3.5">
                 {appRows.length === 0 && <p className="text-sm text-slate-400">No school yet.</p>}
                 {appRows.map((a) => {
@@ -224,6 +230,19 @@ export default async function CasePage({ params, searchParams }: {
                             success={st.milestone === "success"} canEdit={canStage(st) && !dim} today={today} />;
                         })}
                       </div>
+                      {canEdit && (
+                        <details className="mt-2 text-[13px]">
+                          <summary className="cursor-pointer text-navy">Edit programme and fee</summary>
+                          <form action={updateApplication} className="mt-2 flex flex-wrap items-end gap-2">
+                            <input type="hidden" name="case_id" value={id} />
+                            <input type="hidden" name="application_id" value={a.id} />
+                            <Field label="Programme" className="flex-[2_1_180px]"><input name="programme" defaultValue={a.programme ?? ""} className={inputCls} /></Field>
+                            <Field label="Fee the commission is based on" className="flex-[1_1_140px]"><input name="fee" inputMode="decimal" defaultValue={a.commissionable_fee ?? ""} className={inputCls} /></Field>
+                            <Field label="Currency"><select name="currency" defaultValue={a.currency} className={inputCls}>{CURRENCIES.map((x) => <option key={x}>{x}</option>)}</select></Field>
+                            <Submit variant="ghost">Save</Submit>
+                          </form>
+                        </details>
+                      )}
                       {fbs[0] && <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-[13px] text-slate-600">{fmtDate(fbs[0].date)} · {fbs[0].feedback}{fbs[0].action ? ` · Next: ${fbs[0].action}` : ""}</div>}
                       {(fbs.length > 1 || canEdit) && (
                         <details className="mt-2 text-[13px]">
@@ -261,6 +280,9 @@ export default async function CasePage({ params, searchParams }: {
                             .map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
                         </select>
                       </Field>
+                      <Field label="Programme" className="flex-[1_1_160px]">
+                        <input name="programme" placeholder="e.g. Year 12" className={inputCls} />
+                      </Field>
                       <Field label="Fee the commission is based on" className="flex-[1_1_160px]">
                         <input name="fee" inputMode="decimal" placeholder="e.g. 52000" className={inputCls} />
                       </Field>
@@ -281,7 +303,7 @@ export default async function CasePage({ params, searchParams }: {
               {[...openTasks, ...doneTasks].map((t) => {
                 const late = !t.done_at && t.due_date < today;
                 const due = t.done_at ? `Done ${fmtDate(t.done_at.slice(0, 10))}` : t.due_date === today ? "Today" : late ? `${daysBetween(t.due_date, today)} days late` : fmtDate(t.due_date);
-                const mayTick = open && (canEdit || t.assigned_to === me.id);
+                const mayTick = canEdit || (open && t.assigned_to === me.id);
                 return (
                   <form key={t.id} action={toggleTask} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-100 py-2.5 text-sm">
                     <input type="hidden" name="case_id" value={id} />
@@ -368,7 +390,7 @@ export default async function CasePage({ params, searchParams }: {
                 <span>{who.get(l.staff_id)}</span>
                 <span className="flex items-center gap-2 text-[13px] text-slate-500">
                   {l.end_date ? `${fmtDate(l.start_date)} to ${fmtDate(l.end_date)}` : `since ${fmtDate(l.start_date)}`}
-                  {isAdmin && !l.end_date && open && (
+                  {isAdmin && !l.end_date && (
                     <form action={endStaff}><input type="hidden" name="case_id" value={id} /><input type="hidden" name="link_id" value={l.id} />
                       <button className="text-brand-red hover:underline">Remove</button></form>
                   )}
