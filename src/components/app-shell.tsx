@@ -1,9 +1,20 @@
 import Image from "next/image";
 import Link from "next/link";
 
-const NAV = [{ href: "/dashboard", label: "Dashboard" }, { href: "/cases", label: "Cases" }];
+import { getMe } from "@/lib/auth";
 
-export function AppShell({ name, active, children }: { name: string; active: string; children: React.ReactNode }) {
+// The header loads who is signed in itself (cached per request), and shows Approvals with a count to admin only.
+export async function AppShell({ active, children }: { name?: string; active: string; children: React.ReactNode }) {
+  const { supabase, me } = await getMe();
+  const isAdmin = me.role === "admin";
+  const { count } = isAdmin
+    ? await supabase.from("stage_updates").select("id", { count: "exact", head: true }).eq("approval", "pending")
+    : { count: 0 };
+  const nav = [
+    { href: "/dashboard", label: "Dashboard" },
+    { href: "/cases", label: "Cases" },
+    ...(isAdmin ? [{ href: "/approvals", label: "Approvals", badge: count ?? 0 }] : []),
+  ] as { href: string; label: string; badge?: number }[];
   return (
     <div className="min-h-dvh">
       <header className="border-b border-slate-200 bg-white">
@@ -12,17 +23,18 @@ export function AppShell({ name, active, children }: { name: string; active: str
             <Image src="/logo.png" alt="APSthai" width={848} height={342} priority className="h-auto w-24" />
           </Link>
           <nav className="flex flex-1 flex-wrap gap-1 text-sm">
-            {NAV.map((n) => (
+            {nav.map((n) => (
               <Link key={n.href} href={n.href}
                 className={active.startsWith(n.href)
-                  ? "rounded-lg bg-navy-50 px-3 py-2 font-semibold text-navy"
-                  : "rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-50 hover:text-navy"}>
+                  ? "flex items-center gap-1.5 rounded-lg bg-navy-50 px-3 py-2 font-semibold text-navy"
+                  : "flex items-center gap-1.5 rounded-lg px-3 py-2 text-slate-600 hover:bg-slate-50 hover:text-navy"}>
                 {n.label}
+                {n.badge ? <span className="rounded-full bg-brand-red px-1.5 text-xs leading-5 font-semibold text-white">{n.badge}</span> : null}
               </Link>
             ))}
           </nav>
           <div className="flex items-center gap-3 text-sm text-slate-600">
-            <span>{name}</span>
+            <span>{me.codename}</span>
             <form action="/auth/signout" method="post">
               <button className="rounded-lg border border-slate-300 px-3 py-1.5 text-[13px] hover:border-navy hover:text-navy">Sign out</button>
             </form>

@@ -4,6 +4,7 @@ import { AppShell, Card } from "@/components/app-shell";
 import { Field, inputCls } from "@/components/fields";
 import { Flash } from "@/components/flash";
 import { Submit } from "@/components/submit";
+import { UndoButton } from "@/components/undo-success";
 import { getMe } from "@/lib/auth";
 import { daysBetween, fmtDate, fmtMonth, todayBangkok } from "@/lib/dates";
 import { fmtTHB } from "@/lib/money";
@@ -52,7 +53,7 @@ export default async function CasePage({ params, searchParams }: {
     sb.from("products").select("id, school:schools(name, type), partner:partners(name)").eq("category_id", kase.category_id).eq("active", true),
     sb.from("lead_channels").select("id, name_en").eq("active", true).order("sort_order"),
     sb.from("partners").select("id, name").eq("active", true).order("name"),
-    sb.from("stage_updates").select("id, application_id, stage_id, status, approval, date, remark, created_at, created_by").eq("case_id", id).order("created_at", { ascending: false }),
+    sb.from("stage_updates").select("id, application_id, stage_id, status, approval, approval_note, date, remark, created_at, created_by").eq("case_id", id).order("created_at", { ascending: false }),
     sb.from("cases").select("id, intake, overall_status, category:categories(name_en)").eq("student_id", kase.student.id).neq("id", id).order("intake"),
     sb.from("education").select("academic_year, school:schools(name), level:levels(name_en)").eq("student_id", kase.student.id).order("academic_year", { ascending: false }).limit(1),
     sb.from("contacts").select("relation, type, value").eq("student_id", kase.student.id).eq("active", true).limit(2),
@@ -63,6 +64,11 @@ export default async function CasePage({ params, searchParams }: {
   const appRows = (apps.data ?? []) as unknown as App[];
   const appName = (a: App | undefined) => a?.product.school?.name ?? a?.product.partner?.name ?? "School";
   const appIds = appRows.map((a) => a.id);
+  // Approvals and rejections (with the reason) are kept in the change log.
+  const suIds = ((stageLog.data ?? []) as { id: string }[]).map((u) => u.id);
+  const { data: approvalLog } = suIds.length
+    ? await sb.from("change_log").select("row_id, action, new_value, changed_at, changed_by").eq("table_name", "stage_updates").in("action", ["approve", "reject"]).in("row_id", suIds)
+    : { data: [] };
   // Result changes are only in the change log (admin and the case's staff can read it).
   const { data: resultLog } = appIds.length
     ? await sb.from("change_log").select("row_id, new_value, changed_at, changed_by").eq("table_name", "applications").eq("field", "result").in("row_id", appIds)
@@ -122,6 +128,8 @@ export default async function CasePage({ params, searchParams }: {
     ...appRows.map((a) => ({ at: a.created_at, by: a.created_by, what: `School added: ${appName(a)}` })),
     ...((resultLog ?? []) as { row_id: string; new_value: string; changed_at: string; changed_by: string | null }[])
       .map((r) => ({ at: r.changed_at, by: r.changed_by, what: `${appName(appById.get(r.row_id))}: result ${r.new_value.replace("_", " ")}` })),
+    ...((approvalLog ?? []) as { row_id: string; action: string; new_value: string | null; changed_at: string; changed_by: string | null }[])
+      .map((l) => ({ at: l.changed_at, by: l.changed_by, what: l.action === "approve" ? "Success approved" : `Success rejected: ${l.new_value ?? ""}` })),
     ...taskRows.map((t) => ({ at: t.created_at, by: t.created_by, what: `Task added: ${t.title}` })),
     ...doneTasks.map((t) => ({ at: t.done_at!, by: t.done_by, what: `Task done: ${t.title}` })),
     ...fbRows.map((f) => ({ at: f.created_at, by: f.created_by, what: `Feedback on ${appName(appById.get(f.application_id))}: ${f.feedback}` })),
@@ -163,6 +171,7 @@ export default async function CasePage({ params, searchParams }: {
             </form>
           </details>
         )}
+        {isAdmin && kase.overall_status === "success" && <UndoButton caseId={id} back={`/cases/${id}`} />}
         {isAdmin && kase.overall_status === "fail" && (
           <form action={reopenCase}><input type="hidden" name="case_id" value={id} /><Submit variant="ghost">Reopen case</Submit></form>
         )}
@@ -173,6 +182,17 @@ export default async function CasePage({ params, searchParams }: {
           This case is closed. Only admin can edit it. Stages stay locked. Changing staff on a successful case splits its points again among the new staff.
         </p>
       )}
+
+      {(() => {
+        // Show the latest rejection while that stage is still not resubmitted.
+        const rej = ((stageLog.data ?? []) as { approval_note: string | null; approval: string; status: string; stage_id: string; application_id: string | null }[])
+          .find((u) => u.approval_note && u.approval === "not_required" && u.status !== "completed");
+        return rej && open ? (
+          <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-brand-red">
+            Admin did not approve {rej.application_id ? `${appName(appById.get(rej.application_id))}: ` : ""}{stageName.get(rej.stage_id)}. Reason: {rej.approval_note}
+          </p>
+        ) : null;
+      })()}
 
       {kase.overall_status === "fail" && (
         <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-brand-red">Lost on {fmtDate(kase.closed_date)}: {kase.overall_remark}</p>
