@@ -73,6 +73,7 @@ export default async function CasePage({ params, searchParams }: {
   const { data: resultLog } = appIds.length
     ? await sb.from("change_log").select("row_id, new_value, changed_at, changed_by").eq("table_name", "applications").eq("field", "result").in("row_id", appIds)
     : { data: [] };
+  const { data: revertLog } = await sb.from("change_log").select("changed_at, changed_by").eq("table_name", "cases").eq("action", "revert").eq("row_id", id);
   const { data: fb } = appIds.length
     ? await sb.from("feedback").select("id, application_id, date, feedback, action, created_at, created_by").in("application_id", appIds).order("date", { ascending: false })
     : { data: [] };
@@ -130,6 +131,8 @@ export default async function CasePage({ params, searchParams }: {
       .map((r) => ({ at: r.changed_at, by: r.changed_by, what: `${appName(appById.get(r.row_id))}: result ${r.new_value.replace("_", " ")}` })),
     ...((approvalLog ?? []) as { row_id: string; action: string; new_value: string | null; changed_at: string; changed_by: string | null }[])
       .map((l) => ({ at: l.changed_at, by: l.changed_by, what: l.action === "approve" ? "Success approved" : `Success rejected: ${l.new_value ?? ""}` })),
+    ...((revertLog ?? []) as { changed_at: string; changed_by: string | null }[])
+      .map((l) => ({ at: l.changed_at, by: l.changed_by, what: "Success undone, case back in progress" })),
     ...taskRows.map((t) => ({ at: t.created_at, by: t.created_by, what: `Task added: ${t.title}` })),
     ...doneTasks.map((t) => ({ at: t.done_at!, by: t.done_by, what: `Task done: ${t.title}` })),
     ...fbRows.map((f) => ({ at: f.created_at, by: f.created_by, what: `Feedback on ${appName(appById.get(f.application_id))}: ${f.feedback}` })),
@@ -184,8 +187,10 @@ export default async function CasePage({ params, searchParams }: {
       )}
 
       {(() => {
-        // Show the latest rejection while that stage is still not resubmitted.
+        // Show a rejection only while it is still the latest update of its stage (stageLog is newest first).
+        const seen = new Set<string>();
         const rej = ((stageLog.data ?? []) as { approval_note: string | null; approval: string; status: string; stage_id: string; application_id: string | null }[])
+          .filter((u) => { const k = `${u.application_id ?? ""}|${u.stage_id}`; if (seen.has(k)) return false; seen.add(k); return true; })
           .find((u) => u.approval_note && u.approval === "not_required" && u.status !== "completed");
         return rej && open ? (
           <p className="rounded-lg bg-red-50 px-4 py-3 text-sm text-brand-red">
