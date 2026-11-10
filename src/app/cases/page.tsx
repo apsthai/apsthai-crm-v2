@@ -56,7 +56,7 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
     intake: (r) => r.intake,
     stage: (r) => prog.get(r.id)?.furthest_stage_en ?? "",
     chance: (r) => Number(prog.get(r.id)?.probability_pct ?? 0),
-    staff: (r) => staffOf(r) || "~",
+    staff: (r) => staffOf(r) || "\uffff", // no staff sorts last
     task: (r) => nextTask.get(r.id)?.due_date ?? "0000",
   };
   const sort = sp.sort && KEYS[sp.sort] ? sp.sort : "task";
