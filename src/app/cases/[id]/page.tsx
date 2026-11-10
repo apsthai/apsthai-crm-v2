@@ -98,6 +98,7 @@ export default async function CasePage({ params, searchParams }: {
   };
   const canStage = (st: Stage) => open && (canEdit || (st.editable_by_team_id !== null && myTeams.has(st.editable_by_team_id)));
 
+  const single = appStages.length === 0 ? appRows.find((a) => a.product.school?.type !== "in_house") : undefined;
   const chance = prog.data ? Math.round(Number(prog.data.probability_pct)) : 0;
   const weightedTHB = (weighted.data ?? []).reduce((a, r) => a + Number(r.amount_thb), 0);
   const { data: recv } = canMoney
@@ -349,9 +350,24 @@ export default async function CasePage({ params, searchParams }: {
               ["Client", kase.applicant === "student" ? "Student" : `${APPLICANTS.find((x) => x[0] === kase.applicant)?.[1]}${kase.applicant_name ? ` (${kase.applicant_name})` : ""}`],
               ["Lead source", kase.lead?.name_en ?? "-"], ["Referred by", kase.referred_by ?? "-"],
               ["Sub-agent", kase.sub_agent ? `${kase.sub_agent.name} · ${kase.sub_agent_pct ?? 0}%` : "-"],
+              // Services without per-school stages show their one provider here instead of a "Schools" card.
+              ...(single ? [["Provider", appName(single)], ["Programme", single.programme ?? "-"]] : []),
             ].map(([k, v]) => (
               <div key={k} className="flex justify-between gap-3 border-b border-slate-100 py-2 text-sm last:border-0"><span className="text-slate-500">{k}</span><span className="text-right">{v}</span></div>
             ))}
+            {canEdit && single && (
+              <details className="mt-2 text-sm">
+                <summary className="cursor-pointer text-navy">Edit programme</summary>
+                <form action={updateApplication} className="mt-3 flex flex-col gap-2.5">
+                  <input type="hidden" name="case_id" value={id} />
+                  <input type="hidden" name="application_id" value={single.id} />
+                  <input type="hidden" name="fee" value={single.commissionable_fee ?? ""} />
+                  <input type="hidden" name="currency" value={single.currency} />
+                  <Field label="Programme"><input name="programme" defaultValue={single.programme ?? ""} className={inputCls} /></Field>
+                  <Submit>Save</Submit>
+                </form>
+              </details>
+            )}
             {canEdit && (
               <details className="mt-2 text-sm">
                 <summary className="cursor-pointer text-navy">Edit case</summary>
