@@ -43,7 +43,7 @@ export default async function CasePage({ params, searchParams }: {
     sb.from("case_staff").select("id, staff_id, start_date, end_date, created_at").eq("case_id", id).order("start_date"),
     sb.from("stages").select("id, name_en, sort_order, level, milestone, editable_by_team_id").eq("category_id", kase.category_id).eq("active", true).order("sort_order"),
     sb.from("v_stage_latest").select("application_id, stage_id, status, date, approval").eq("case_id", id),
-    sb.from("applications").select("id, commissionable_fee, currency, expected_income, result, created_at, created_by, product:products(school:schools(name, type), partner:partners(name))").eq("case_id", id).order("created_at"),
+    sb.from("applications").select("id, programme, commissionable_fee, currency, expected_income, result, created_at, created_by, product:products(school:schools(name, type), partner:partners(name))").eq("case_id", id).order("created_at"),
     sb.from("tasks").select("id, title, due_date, assigned_to, done_at, done_by, created_at, created_by").eq("case_id", id).order("due_date"),
     sb.from("v_case_progress").select("probability_pct").eq("case_id", id).maybeSingle(),
     sb.from("v_cashflow").select("amount_thb").eq("kind", "weighted").eq("case_id", id),
@@ -58,7 +58,7 @@ export default async function CasePage({ params, searchParams }: {
     sb.from("contacts").select("relation, type, value").eq("student_id", kase.student.id).eq("active", true).limit(2),
   ]);
 
-  type App = { id: string; commissionable_fee: number | null; currency: string; expected_income: number | null; result: string; created_at: string; created_by: string | null;
+  type App = { id: string; programme: string | null; commissionable_fee: number | null; currency: string; expected_income: number | null; result: string; created_at: string; created_by: string | null;
     product: { school: { name: string; type: string } | null; partner: { name: string } | null } };
   const appRows = (apps.data ?? []) as unknown as App[];
   const appName = (a: App | undefined) => a?.product.school?.name ?? a?.product.partner?.name ?? "School";
@@ -197,7 +197,7 @@ export default async function CasePage({ params, searchParams }: {
                     <div key={a.id} className={`rounded-xl border border-slate-200 p-4 ${dim ? "opacity-60" : ""}`}>
                       <div className="flex flex-wrap justify-between gap-2">
                         <div>
-                          <div className="text-[15px] font-semibold">{appName(a)}</div>
+                          <div className="text-[15px] font-semibold">{appName(a)}{a.programme && <span className="font-normal text-slate-500"> · {a.programme}</span>}</div>
                           {canMoney && (
                             <div className="text-[13px] text-slate-500">
                               Fee {money(a.commissionable_fee, a.currency)} · expected income {money(a.expected_income, a.currency)} incl. VAT
