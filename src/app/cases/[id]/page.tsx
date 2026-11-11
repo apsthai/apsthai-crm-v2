@@ -42,7 +42,7 @@ export default async function CasePage({ params, searchParams }: {
   };
 
   const [links, stages, latest, apps, tasks, prog, weighted, staff, teams, products, channels, partners, stageLog, otherCases, edu, contacts] = await Promise.all([
-    sb.from("case_staff").select("id, staff_id, start_date, end_date, created_at").eq("case_id", id).order("start_date"),
+    sb.from("case_staff").select("id, staff_id, start_date, end_date, created_at").eq("case_id", id).order("start_date").order("created_at"),
     sb.from("stages").select("id, name_en, sort_order, level, milestone, editable_by_team_id").eq("category_id", kase.category_id).eq("active", true).order("sort_order"),
     sb.from("v_stage_latest").select("application_id, stage_id, status, date, approval").eq("case_id", id),
     sb.from("applications").select("id, programme, commissionable_fee, currency, expected_income, result, created_at, created_by, product:products(school:schools(name, type), partner:partners(name))").eq("case_id", id).order("created_at"),
