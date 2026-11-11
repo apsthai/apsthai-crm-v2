@@ -75,7 +75,10 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
 
   return (
     <AppShell name={me.codename} active="/cases">
-      <h1 className="text-2xl font-semibold text-slate-900">Cases</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-2xl font-semibold text-slate-900">Cases</h1>
+        <Link href="/cases/new" className="rounded-lg bg-navy px-4 py-2 text-sm font-medium text-white hover:bg-navy-dark">+ New case</Link>
+      </div>
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex gap-1 rounded-lg bg-slate-200 p-1 text-sm">

@@ -8,10 +8,11 @@ import { UndoButton } from "@/components/undo-success";
 import { getMe } from "@/lib/auth";
 import { daysBetween, fmtDate, fmtMonth, todayBangkok } from "@/lib/dates";
 import { fmtTHB } from "@/lib/money";
-import { addApplication, addFeedback, updateApplication, addStaff, addTask, closeLost, endStaff, reopenCase, setResult, toggleTask, updateCase } from "./actions";
+import { addApplication, addFeedback, updateApplication, addStaff, addTask, closeLost, endStaff, reopenCase, setResult, toggleTask, updateCase, updateStudent } from "./actions";
 import { type ChipState, StageChip } from "./stage-chip";
 
 const CURRENCIES = ["GBP", "THB", "USD", "EUR", "AUD", "NZD", "CAD", "SGD", "CHF"];
+const RELATION_WORD: Record<string, string> = { mother: "Mother", father: "Father", guardian: "Guardian", student: "Student", other: "Other" };
 const APPLICANTS = [["student", "Student"], ["father", "Father"], ["mother", "Mother"], ["guardian", "Guardian"], ["other", "Other"]];
 const RESULTS = [["in_progress", "In progress"], ["offered", "Offered"], ["rejected", "Rejected"], ["withdrawn", "Withdrawn"]];
 const RESULT_LOOK: Record<string, string> = {
@@ -31,12 +32,12 @@ export default async function CasePage({ params, searchParams }: {
   const isAdmin = me.role === "admin";
 
   const { data: c, error } = await sb.from("cases")
-    .select("id, intake, applicant, applicant_name, referred_by, sub_agent_pct, sub_agent_id, lead_channel_id, overall_status, overall_remark, closed_date, created_at, created_by, category_id, student:students(id, codename), category:categories(name_en, in_house), lead:lead_channels(name_en), sub_agent:partners(name)")
+    .select("id, intake, applicant, applicant_name, referred_by, sub_agent_pct, sub_agent_id, lead_channel_id, overall_status, overall_remark, closed_date, created_at, created_by, category_id, student:students(id, codename, nickname, firstname, lastname), category:categories(name_en, in_house), lead:lead_channels(name_en), sub_agent:partners(name)")
     .eq("id", id).maybeSingle();
   if (error) throw new Error(error.message);
   if (!c) notFound();
   const kase = c as unknown as typeof c & {
-    student: { id: string; codename: string }; category: { name_en: string; in_house: boolean };
+    student: { id: string; codename: string; nickname: string; firstname: string | null; lastname: string | null }; category: { name_en: string; in_house: boolean };
     lead: { name_en: string } | null; sub_agent: { name: string } | null;
   };
 
@@ -56,7 +57,7 @@ export default async function CasePage({ params, searchParams }: {
     sb.from("stage_updates").select("id, application_id, stage_id, status, approval, approval_note, date, remark, created_at, created_by").eq("case_id", id).order("created_at", { ascending: false }),
     sb.from("cases").select("id, intake, overall_status, category:categories(name_en)").eq("student_id", kase.student.id).neq("id", id).order("intake"),
     sb.from("education").select("academic_year, school:schools(name), level:levels(name_en)").eq("student_id", kase.student.id).order("academic_year", { ascending: false }).limit(1),
-    sb.from("contacts").select("relation, type, value").eq("student_id", kase.student.id).eq("active", true).limit(2),
+    sb.from("contacts").select("relation, type, value").eq("student_id", kase.student.id).eq("active", true).in("type", ["phone", "line"]).order("created_at"),
   ]);
 
   type App = { id: string; programme: string | null; commissionable_fee: number | null; currency: string; expected_income: number | null; result: string; created_at: string; created_by: string | null;
@@ -145,7 +146,10 @@ export default async function CasePage({ params, searchParams }: {
     : kase.overall_status === "fail" ? ["Lost", "bg-red-50 text-brand-red"]
     : kase.overall_status === "in_progress" ? ["In progress", "bg-navy-50 text-navy"] : ["Not started", "bg-slate-100 text-slate-600"];
   const edu0 = (edu.data ?? [])[0] as unknown as { academic_year: string; school: { name: string } | null; level: { name_en: string } | null } | undefined;
-  const phone = ((contacts.data ?? []) as { relation: string; type: string; value: string }[]).find((x) => x.type === "phone");
+  const contactRows = (contacts.data ?? []) as { relation: string; type: string; value: string }[];
+  const phone = contactRows.find((x) => x.type === "phone");
+  const line = contactRows.find((x) => x.type === "line");
+  const canEditStudent = isAdmin || onCase;
 
   return (
     <AppShell name={me.codename} active="/cases">
@@ -473,7 +477,29 @@ export default async function CasePage({ params, searchParams }: {
           <Card title="Student">
             <div className="text-sm">{kase.student.codename}</div>
             {edu0 && <div className="text-[13px] text-slate-500">{edu0.level?.name_en ?? ""} · {edu0.school?.name ?? ""} ({edu0.academic_year})</div>}
-            {phone && <div className="mt-1.5 text-[13px] text-slate-500">{phone.relation} · {phone.value}</div>}
+            {kase.student.lastname && <div className="text-[13px] text-slate-500">Last name: {kase.student.lastname}</div>}
+            {phone && <div className="mt-1.5 text-[13px] text-slate-500">{RELATION_WORD[phone.relation] ?? phone.relation} · {phone.value}</div>}
+            {line && <div className="text-[13px] text-slate-500">{RELATION_WORD[line.relation] ?? line.relation} · LINE {line.value}</div>}
+            {canEditStudent && (
+              <details className="mt-2 text-sm">
+                <summary className="cursor-pointer text-navy">Edit student</summary>
+                <form action={updateStudent} className="mt-3 flex flex-col gap-2.5">
+                  <input type="hidden" name="case_id" value={id} />
+                  <input type="hidden" name="student_id" value={kase.student.id} />
+                  <Field label="Nickname *"><input name="nickname" defaultValue={kase.student.nickname} required className={inputCls} /></Field>
+                  <Field label="First name *"><input name="firstname" defaultValue={kase.student.firstname ?? ""} required className={inputCls} /></Field>
+                  <Field label="Last name"><input name="lastname" defaultValue={kase.student.lastname ?? ""} className={inputCls} /></Field>
+                  <Field label="Contact person">
+                    <select name="relation" defaultValue={(phone ?? line)?.relation ?? "mother"} className={inputCls}>
+                      {Object.entries(RELATION_WORD).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                  </Field>
+                  <Field label="Phone"><input name="phone" inputMode="tel" defaultValue={phone?.value ?? ""} className={inputCls} /></Field>
+                  <Field label="LINE ID"><input name="line" defaultValue={line?.value ?? ""} className={inputCls} /></Field>
+                  <Submit>Save</Submit>
+                </form>
+              </details>
+            )}
             {(otherCases.data ?? []).length > 0 && (
               <div className="mt-2 text-[13px] text-slate-500">Other cases:{" "}
                 {((otherCases.data ?? []) as unknown as { id: string; intake: string; category: { name_en: string } }[]).map((o, i) => (

@@ -138,3 +138,29 @@ export async function updateApplication(fd: FormData) {
   }).eq("id", s(fd, "application_id")!).select("id");
   back(caseId, changed(r));
 }
+
+// Names and the main contact (one phone, one LINE). An empty field removes that contact.
+export async function updateStudent(fd: FormData) {
+  const { supabase } = await getMe();
+  const caseId = s(fd, "case_id")!;
+  const studentId = s(fd, "student_id")!;
+  if (!s(fd, "nickname") || !s(fd, "firstname")) return back(caseId, "Enter the nickname and first name");
+  const r = await supabase.from("students").update({
+    nickname: s(fd, "nickname"), firstname: s(fd, "firstname"), lastname: s(fd, "lastname"),
+  }).eq("id", studentId).select("id");
+  const e = changed(r);
+  if (e) return back(caseId, e);
+
+  const relation = s(fd, "relation") ?? "mother";
+  for (const type of ["phone", "line"] as const) {
+    const value = s(fd, type);
+    const { data: cur } = await supabase.from("contacts").select("id").eq("student_id", studentId).eq("type", type).eq("active", true).order("created_at").limit(1);
+    const row = cur?.[0];
+    const res = row && value ? await supabase.from("contacts").update({ value, relation }).eq("id", row.id)
+      : row ? await supabase.from("contacts").update({ active: false }).eq("id", row.id)
+      : value ? await supabase.from("contacts").insert({ student_id: studentId, relation, type, value })
+      : null;
+    if (res?.error) return back(caseId, res.error);
+  }
+  back(caseId);
+}
