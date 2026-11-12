@@ -13,7 +13,7 @@ export async function AppShell({ active, children }: { name?: string; active: st
   const nav = [
     { href: "/dashboard", label: "Dashboard" },
     { href: "/cases", label: "Cases" },
-    ...(isAdmin ? [{ href: "/approvals", label: "Approvals", badge: count ?? 0 }] : []),
+    ...(isAdmin ? [{ href: "/approvals", label: "Approvals", badge: count ?? 0 }, { href: "/admin/staff", label: "Staff" }] : []),
   ] as { href: string; label: string; badge?: number }[];
   return (
     <div className="min-h-dvh">
