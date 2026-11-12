@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useActionState, useState } from "react";
+import { MonthPick } from "@/components/date-pick";
 import { Field, inputCls } from "@/components/fields";
 import { Submit } from "@/components/submit";
 import { createCase, type NewCaseState } from "./actions";
@@ -35,9 +36,9 @@ function StudentLine({ s }: { s: StudentOption }) {
   );
 }
 
-export function NewCaseForm({ students, services, channels, staff, me }: {
+export function NewCaseForm({ students, services, channels, staff, me, thisYear }: {
   students: StudentOption[]; services: Opt[]; channels: Opt[]; staff: { id: string; codename: string }[];
-  me: { id: string; codename: string; isAdmin: boolean };
+  me: { id: string; codename: string; isAdmin: boolean }; thisYear: number;
 }) {
   const [state, action] = useActionState<NewCaseState, FormData>(createCase, { error: null });
   const [mode, setMode] = useState<"pick" | "new">("pick");
@@ -55,7 +56,7 @@ export function NewCaseForm({ students, services, channels, staff, me }: {
   const dups = mode === "new" && norm(st.firstname) ? students.filter((s) => norm(s.firstname) === norm(st.firstname)) : [];
   const staff1 = me.isAdmin ? cs.staff1 : me.id;
   const ready = (mode === "pick" ? !!picked : !!st.nickname.trim() && !!st.firstname.trim() && (dups.length === 0 || allowDup))
-    && !!cs.category_id && !!cs.intake;
+    && !!cs.category_id && /^\d{4}-\d{2}$/.test(cs.intake);
 
   const choose = (s: StudentOption) => { setPicked(s); setMode("pick"); setQ(""); };
   const upd = (k: keyof typeof st) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setSt({ ...st, [k]: e.target.value });
@@ -144,9 +145,10 @@ export function NewCaseForm({ students, services, channels, staff, me }: {
               {services.map((c) => <option key={c.id} value={c.id}>{c.name_en}</option>)}
             </select>
           </Field>
-          <Field label="Intake (month and year) *">
-            <input type="month" name="intake" value={cs.intake} onChange={updC("intake")} className={inputCls} required />
-          </Field>
+          <div className="flex min-w-0 flex-col gap-1">
+            <span className="text-[13px] font-medium text-slate-600">Intake (month and year) *</span>
+            <MonthPick name="intake" label="Intake" value={cs.intake} onChange={(v) => setCs({ ...cs, intake: v })} around={thisYear} required />
+          </div>
           <Field label="Lead source">
             <select name="lead_channel_id" value={cs.lead_channel_id} onChange={updC("lead_channel_id")} className={inputCls}>
               <option value="">-</option>

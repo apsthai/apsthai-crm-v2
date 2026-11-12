@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { DatePick } from "@/components/date-pick";
 import { inputCls } from "@/components/fields";
 import { Submit } from "@/components/submit";
 import { updateStage } from "./actions";
@@ -67,9 +68,9 @@ export function StageChip({ caseId, applicationId, stageId, name, state, note, s
               {STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </label>
-          <label className="flex flex-col gap-1 text-[13px] font-medium text-slate-600">Date
-            <input type="date" name="date" defaultValue={today} className={inputCls} />
-          </label>
+          <div className="flex flex-col gap-1 text-[13px] font-medium text-slate-600">Date
+            <DatePick name="date" defaultValue={today} />
+          </div>
           <label className="flex flex-col gap-1 text-[13px] font-medium text-slate-600">Note
             <input name="remark" placeholder="Optional" className={inputCls} />
           </label>

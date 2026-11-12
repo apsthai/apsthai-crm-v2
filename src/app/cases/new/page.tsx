@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { getMe } from "@/lib/auth";
-import { fmtMonth } from "@/lib/dates";
+import { fmtMonth, todayBangkok } from "@/lib/dates";
 import { NewCaseForm, type StudentOption } from "./new-case-form";
 
 export default async function NewCasePage() {
@@ -34,6 +34,7 @@ export default async function NewCasePage() {
         channels={(channels.data ?? []) as { id: string; name_en: string }[]}
         staff={(staff.data ?? []) as { id: string; codename: string }[]}
         me={{ id: me.id, codename: me.codename, isAdmin: me.role === "admin" }}
+        thisYear={Number(todayBangkok().slice(0, 4))}
       />
     </AppShell>
   );

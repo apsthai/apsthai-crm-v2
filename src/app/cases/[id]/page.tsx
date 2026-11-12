@@ -4,11 +4,14 @@ import { AppShell, Card } from "@/components/app-shell";
 import { Field, inputCls } from "@/components/fields";
 import { Flash } from "@/components/flash";
 import { Submit } from "@/components/submit";
+import { DatePick, MonthPick } from "@/components/date-pick";
 import { UndoButton } from "@/components/undo-success";
 import { getMe } from "@/lib/auth";
 import { daysBetween, fmtDate, fmtMonth, todayBangkok } from "@/lib/dates";
 import { fmtTHB } from "@/lib/money";
-import { addApplication, addFeedback, updateApplication, addStaff, addTask, closeLost, endStaff, reopenCase, setResult, toggleTask, updateCase, updateStudent } from "./actions";
+import { addFeedback, updateApplication, addStaff, addTask, closeLost, endStaff, reopenCase, setResult, toggleTask, updateCase, updateStudent } from "./actions";
+import { AddSchool } from "./add-school";
+import { ResultSelect } from "./result-select";
 import { type ChipState, StageChip } from "./stage-chip";
 
 const CURRENCIES = ["GBP", "THB", "USD", "EUR", "AUD", "NZD", "CAD", "SGD", "CHF"];
@@ -51,7 +54,7 @@ export default async function CasePage({ params, searchParams }: {
     sb.from("v_cashflow").select("amount_thb").eq("kind", "weighted").eq("case_id", id),
     sb.from("staff").select("id, codename, handles_cases, active").order("codename"),
     sb.from("team_members").select("team_id").eq("staff_id", me.id),
-    sb.from("products").select("id, school:schools(name, type), partner:partners(name)").eq("category_id", kase.category_id).eq("active", true),
+    sb.from("products").select("id, school:schools(name, type, default_currency), partner:partners(name)").eq("category_id", kase.category_id).eq("active", true),
     sb.from("lead_channels").select("id, name_en").eq("active", true).order("sort_order"),
     sb.from("partners").select("id, name").eq("active", true).order("name"),
     sb.from("stage_updates").select("id, application_id, stage_id, status, approval, approval_note, date, remark, created_at, created_by").eq("case_id", id).order("created_at", { ascending: false }),
@@ -244,10 +247,7 @@ export default async function CasePage({ params, searchParams }: {
                           <form action={setResult} className="flex items-center gap-1.5 self-start">
                             <input type="hidden" name="case_id" value={id} />
                             <input type="hidden" name="application_id" value={a.id} />
-                            <select name="result" defaultValue={a.result} aria-label="Result" className={`rounded-full border-0 px-3 py-1 text-xs font-semibold ${RESULT_LOOK[a.result]}`}>
-                              {RESULTS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-                            </select>
-                            <Submit variant="ghost" className="!px-2.5 !py-1 text-xs">Set</Submit>
+                            <ResultSelect value={a.result} options={RESULTS} look={RESULT_LOOK[a.result]} />
                           </form>
                         ) : (
                           <span className={`self-start rounded-full px-3 py-1 text-xs font-semibold ${RESULT_LOOK[a.result]}`}>{a.result === "enrolled" ? "Enrolled" : RESULTS.find((r) => r[0] === a.result)?.[1]}</span>
@@ -285,7 +285,7 @@ export default async function CasePage({ params, searchParams }: {
                                 <input type="hidden" name="application_id" value={a.id} />
                                 <input name="feedback" placeholder="What the school said" aria-label="Feedback" className={`${inputCls} flex-[2_1_220px] !w-auto`} />
                                 <input name="action" placeholder="Next step (optional)" aria-label="Next step" className={`${inputCls} flex-[1_1_160px] !w-auto`} />
-                                <input type="date" name="date" defaultValue={today} aria-label="Date" className={`${inputCls} !w-auto`} />
+                                <DatePick name="date" defaultValue={today} />
                                 <Submit variant="ghost">Add</Submit>
                               </form>
                             )}
@@ -298,29 +298,10 @@ export default async function CasePage({ params, searchParams }: {
                 {canEdit && (
                   <details className="text-sm">
                     <summary className="inline-block cursor-pointer rounded-lg border border-slate-300 px-3 py-2 font-medium text-navy hover:border-navy">+ Add school</summary>
-                    <form action={addApplication} className="mt-3 flex flex-wrap items-end gap-2">
-                      <input type="hidden" name="case_id" value={id} />
-                      <Field label="School" className="flex-[2_1_240px]">
-                        <select name="product_id" required className={inputCls} defaultValue="">
-                          <option value="" disabled>Choose a school</option>
-                          {((products.data ?? []) as unknown as { id: string; school: { name: string; type: string } | null; partner: { name: string } | null }[])
-                            .filter((p) => p.school?.type !== "in_house")
-                            .map((p) => ({ id: p.id, name: p.school?.name ?? p.partner?.name ?? "?" }))
-                            .sort((x, y) => x.name.localeCompare(y.name))
-                            .map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                        </select>
-                      </Field>
-                      <Field label="Programme" className="flex-[1_1_160px]">
-                        <input name="programme" placeholder="e.g. Year 12" className={inputCls} />
-                      </Field>
-                      <Field label="Fee the commission is based on" className="flex-[1_1_160px]">
-                        <input name="fee" inputMode="decimal" placeholder="e.g. 52000" className={inputCls} />
-                      </Field>
-                      <Field label="Currency">
-                        <select name="currency" defaultValue="GBP" className={inputCls}>{CURRENCIES.map((x) => <option key={x}>{x}</option>)}</select>
-                      </Field>
-                      <Submit>Add school</Submit>
-                    </form>
+                    <AddSchool caseId={id} currencies={CURRENCIES} schools={((products.data ?? []) as unknown as { id: string; school: { name: string; type: string; default_currency: string | null } | null; partner: { name: string } | null }[])
+                      .filter((p) => p.school?.type !== "in_house")
+                      .map((p) => ({ id: p.id, name: p.school?.name ?? p.partner?.name ?? "?", currency: p.school?.default_currency ?? null }))
+                      .sort((x, y) => x.name.localeCompare(y.name))} />
                   </details>
                 )}
               </div>
@@ -354,7 +335,7 @@ export default async function CasePage({ params, searchParams }: {
               <form action={addTask} className="mt-3.5 flex flex-wrap gap-2">
                 <input type="hidden" name="case_id" value={id} />
                 <input name="title" placeholder="New task, e.g. Send deposit invoice details" aria-label="New task" className={`${inputCls} flex-[1_1_240px] !w-auto`} />
-                <input type="date" name="due_date" defaultValue={today} aria-label="Due date" className={`${inputCls} !w-auto`} />
+                <DatePick name="due_date" defaultValue={today} label="Due date" />
                 <select name="assigned_to" aria-label="Assign to" className={`${inputCls} !w-auto`} defaultValue={assignable.includes(me.id) ? me.id : assignable[0]}>
                   {assignable.map((sid) => <option key={sid} value={sid}>{who.get(sid)}</option>)}
                 </select>
@@ -402,7 +383,7 @@ export default async function CasePage({ params, searchParams }: {
                 <summary className="cursor-pointer text-navy">Edit case</summary>
                 <form action={updateCase} className="mt-3 flex flex-col gap-2.5">
                   <input type="hidden" name="case_id" value={id} />
-                  <Field label="Intake"><input type="month" name="intake" defaultValue={kase.intake.slice(0, 7)} className={inputCls} /></Field>
+                  <div className="flex flex-col gap-1"><span className="text-[13px] font-medium text-slate-600">Intake</span><MonthPick name="intake" label="Intake" defaultValue={kase.intake.slice(0, 7)} around={Number(today.slice(0, 4))} /></div>
                   <Field label="Lead source">
                     <select name="lead_channel_id" defaultValue={kase.lead_channel_id ?? ""} className={inputCls}>
                       <option value="">-</option>

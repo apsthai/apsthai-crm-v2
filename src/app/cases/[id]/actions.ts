@@ -40,6 +40,14 @@ export async function addApplication(fd: FormData) {
   const { supabase } = await getMe();
   const caseId = s(fd, "case_id")!;
   if (!s(fd, "product_id")) return back(caseId, "Choose a school");
+  if (s(fd, "product_id") === "__new__") {
+    // A school not in the list: the database adds it with the default 10% contract and puts it on the case.
+    const { error } = await supabase.rpc("add_new_school", {
+      p_case_id: caseId, p_name: s(fd, "school_name"), p_country: s(fd, "country"), p_type: s(fd, "school_type"),
+      p_currency: s(fd, "currency") ?? "GBP", p_programme: s(fd, "programme"), p_fee: n(fd, "fee"),
+    });
+    return back(caseId, error);
+  }
   const { error } = await supabase.from("applications").insert({
     case_id: caseId, product_id: s(fd, "product_id"), programme: s(fd, "programme"), commissionable_fee: n(fd, "fee"), currency: s(fd, "currency") ?? "GBP",
   });
