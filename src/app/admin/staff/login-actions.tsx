@@ -12,6 +12,9 @@ export function LoginActions({ staffId, username, hasLogin, active, isMe }:
   const [state, action] = useActionState<LoginState, FormData>(manageLogin, { error: null, password: null, done: null });
   const [copied, setCopied] = useState(false);
 
+  // Close the popover as soon as its form is sent, so it does not cover the new password.
+  const closePopover = (e: React.FormEvent<HTMLFormElement>) => e.currentTarget.closest("details")?.removeAttribute("open");
+
   const copy = async () => {
     try { await navigator.clipboard.writeText(`Username: ${username}\nPassword: ${state.password}`); setCopied(true); } catch { /* copy by hand */ }
   };
@@ -29,7 +32,7 @@ export function LoginActions({ staffId, username, hasLogin, active, isMe }:
         {hasLogin && active && (
           <details className="relative">
             <summary className={`${btn} cursor-pointer list-none`}>Reset password</summary>
-            <form action={action} className="absolute right-0 z-20 mt-2 flex w-64 flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-lg">
+            <form action={action} onSubmit={closePopover} className="absolute right-0 z-20 mt-2 flex w-64 flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-lg">
               <input type="hidden" name="staff_id" value={staffId} />
               <input type="hidden" name="action" value="reset_password" />
               <p className="text-slate-700">Make a new password for <b>{username}</b>? The old one stops working.</p>
@@ -40,7 +43,7 @@ export function LoginActions({ staffId, username, hasLogin, active, isMe }:
         {hasLogin && !isMe && (
           <details className="relative">
             <summary className={`${btn} cursor-pointer list-none ${active ? "!text-slate-600" : ""}`}>{active ? "Switch off" : "Switch on"}</summary>
-            <form action={action} className="absolute right-0 z-20 mt-2 flex w-64 flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-lg">
+            <form action={action} onSubmit={closePopover} className="absolute right-0 z-20 mt-2 flex w-64 flex-col gap-2 rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-lg">
               <input type="hidden" name="staff_id" value={staffId} />
               <input type="hidden" name="action" value="set_active" />
               <input type="hidden" name="active" value={active ? "0" : "1"} />
