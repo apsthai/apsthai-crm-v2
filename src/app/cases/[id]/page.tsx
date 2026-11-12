@@ -9,7 +9,7 @@ import { UndoButton } from "@/components/undo-success";
 import { getMe } from "@/lib/auth";
 import { daysBetween, fmtDate, fmtMonth, todayBangkok } from "@/lib/dates";
 import { fmtTHB } from "@/lib/money";
-import { addFeedback, updateApplication, addStaff, addTask, closeLost, endStaff, reopenCase, setResult, toggleTask, updateCase, updateStudent } from "./actions";
+import { addFeedback, updateApplication, addStaff, addTask, closeLost, endStaff, reopenCase, setResult, toggleTask, updateCase, updateStudent, deleteCase } from "./actions";
 import { AddSchool } from "./add-school";
 import { ResultSelect } from "./result-select";
 import { type ChipState, StageChip } from "./stage-chip";
@@ -169,6 +169,7 @@ export default async function CasePage({ params, searchParams }: {
             <span className="text-slate-500">Staff: {current.map((l) => who.get(l.staff_id)).join(", ") || "nobody yet"}</span>
           </div>
         </div>
+        <div className="flex flex-wrap items-start gap-2">
         {canEdit && open && (
           <details className="group relative">
             <summary className="cursor-pointer list-none rounded-lg border border-red-300 bg-white px-3.5 py-2 text-sm text-brand-red hover:bg-red-50">Close as lost</summary>
@@ -185,6 +186,18 @@ export default async function CasePage({ params, searchParams }: {
         {isAdmin && kase.overall_status === "fail" && (
           <form action={reopenCase}><input type="hidden" name="case_id" value={id} /><Submit variant="ghost">Reopen case</Submit></form>
         )}
+        {isAdmin && kase.overall_status !== "success" && (
+          <details className="relative">
+            <summary className="cursor-pointer list-none rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm text-slate-600 hover:border-brand-red hover:text-brand-red">Delete case</summary>
+            <form action={deleteCase} className="absolute right-0 z-20 mt-2 flex w-80 flex-col gap-2.5 rounded-xl border border-slate-200 bg-white p-4 text-sm shadow-lg">
+              <input type="hidden" name="case_id" value={id} />
+              <p className="text-slate-700">Delete this case for good? Its schools, stages, tasks and feedback are deleted too, and this cannot be undone.{(otherCases.data ?? []).length === 0 ? ` ${kase.student.codename} has no other case, so the student is deleted as well.` : ""}</p>
+              <p className="text-[13px] text-slate-500">Use this only for a case made by mistake. For a real case that did not go ahead, use Close as lost.</p>
+              <Submit variant="danger">Delete case</Submit>
+            </form>
+          </details>
+        )}
+        </div>
       </div>
 
       {!open && isAdmin && (
@@ -298,7 +311,7 @@ export default async function CasePage({ params, searchParams }: {
                 {canEdit && (
                   <details className="text-sm">
                     <summary className="inline-block cursor-pointer rounded-lg border border-slate-300 px-3 py-2 font-medium text-navy hover:border-navy">+ Add school</summary>
-                    <AddSchool caseId={id} currencies={CURRENCIES} schools={((products.data ?? []) as unknown as { id: string; school: { name: string; type: string; default_currency: string | null } | null; partner: { name: string } | null }[])
+                    <AddSchool caseId={id} currencies={CURRENCIES} ukOnly={/\bUK\b/.test(kase.category.name_en)} schools={((products.data ?? []) as unknown as { id: string; school: { name: string; type: string; default_currency: string | null } | null; partner: { name: string } | null }[])
                       .filter((p) => p.school?.type !== "in_house")
                       .map((p) => ({ id: p.id, name: p.school?.name ?? p.partner?.name ?? "?", currency: p.school?.default_currency ?? null }))
                       .sort((x, y) => x.name.localeCompare(y.name))} />

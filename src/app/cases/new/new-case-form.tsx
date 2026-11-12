@@ -164,8 +164,8 @@ export function NewCaseForm({ students, services, channels, staff, me, thisYear 
             </select>
           </Field>
           {cs.applicant !== "student" && (
-            <Field label="Client name *">
-              <input name="applicant_name" value={cs.applicant_name} onChange={updC("applicant_name")} className={inputCls} required />
+            <Field label="Client name (if known)">
+              <input name="applicant_name" value={cs.applicant_name} onChange={updC("applicant_name")} className={inputCls} />
             </Field>
           )}
         </div>

@@ -14,9 +14,10 @@ const COUNTRY_CURRENCY: Record<string, string> = {
 const TYPES = [["boarding_school", "Boarding school"], ["university", "University"], ["summer_provider", "Summer provider"], ["other", "Other"]];
 
 // "+ Add school": pick a school we work with, or add one that is not in the list yet (10% commission until Admin checks the contract).
-export function AddSchool({ caseId, schools, currencies }: { caseId: string; schools: School[]; currencies: string[] }) {
+export function AddSchool({ caseId, schools, currencies, ukOnly }: { caseId: string; schools: School[]; currencies: string[]; ukOnly: boolean }) {
   const [pick, setPick] = useState("");
-  const [country, setCountry] = useState("United Kingdom");
+  const [country, setCountry] = useState(ukOnly ? "United Kingdom" : "");
+  const [other, setOther] = useState("");
   const [currency, setCurrency] = useState("GBP");
   const isNew = pick === "__new__";
 
@@ -24,7 +25,7 @@ export function AddSchool({ caseId, schools, currencies }: { caseId: string; sch
     setPick(v);
     const s = schools.find((x) => x.id === v);
     if (s?.currency) setCurrency(s.currency);
-    if (v === "__new__") setCurrency(COUNTRY_CURRENCY[country] ?? currency);
+    if (v === "__new__" && COUNTRY_CURRENCY[country]) setCurrency(COUNTRY_CURRENCY[country]);
   };
 
   return (
@@ -41,11 +42,27 @@ export function AddSchool({ caseId, schools, currencies }: { caseId: string; sch
       {isNew && (
         <div className="flex w-full flex-wrap items-end gap-2 rounded-lg bg-slate-50 p-3">
           <Field label="School name *" className="flex-[2_1_220px]"><input name="school_name" required className={inputCls} /></Field>
-          <Field label="Country *" className="flex-[1_1_160px]">
-            <input name="country" required list="country-list" value={country} className={inputCls}
-              onChange={(e) => { setCountry(e.target.value); if (COUNTRY_CURRENCY[e.target.value]) setCurrency(COUNTRY_CURRENCY[e.target.value]); }} />
-            <datalist id="country-list">{Object.keys(COUNTRY_CURRENCY).map((c) => <option key={c} value={c} />)}</datalist>
-          </Field>
+          {ukOnly ? (
+            <Field label="Country" className="flex-[1_1_160px]">
+              <input type="hidden" name="country" value="United Kingdom" />
+              <div className="py-2 text-sm text-slate-700">United Kingdom</div>
+            </Field>
+          ) : (
+            <>
+              <Field label="Country *" className="flex-[1_1_160px]">
+                <select required value={country} className={inputCls}
+                  onChange={(e) => { setCountry(e.target.value); if (COUNTRY_CURRENCY[e.target.value]) setCurrency(COUNTRY_CURRENCY[e.target.value]); }}>
+                  <option value="" disabled>Choose…</option>
+                  {Object.keys(COUNTRY_CURRENCY).sort().map((c) => <option key={c} value={c}>{c}</option>)}
+                  <option value="__other__">Other…</option>
+                </select>
+              </Field>
+              {country === "__other__" && (
+                <Field label="Country name *" className="flex-[1_1_160px]"><input required value={other} onChange={(e) => setOther(e.target.value)} className={inputCls} /></Field>
+              )}
+              <input type="hidden" name="country" value={country === "__other__" ? other : country} />
+            </>
+          )}
           <Field label="Type *" className="flex-[1_1_150px]">
             <select name="school_type" required defaultValue="" className={inputCls}>
               <option value="" disabled>Choose…</option>

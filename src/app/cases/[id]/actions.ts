@@ -172,3 +172,13 @@ export async function updateStudent(fd: FormData) {
   }
   back(caseId);
 }
+
+// Admin only: delete a case made by mistake (the database refuses successful cases and cases with money).
+export async function deleteCase(fd: FormData) {
+  const { supabase } = await getMe();
+  const caseId = s(fd, "case_id")!;
+  const { error } = await supabase.rpc("delete_case", { p_case_id: caseId });
+  if (error) return back(caseId, error);
+  revalidatePath("/", "layout");
+  redirect("/cases?deleted=1");
+}

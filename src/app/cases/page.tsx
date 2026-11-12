@@ -4,7 +4,7 @@ import { inputCls } from "@/components/fields";
 import { getMe } from "@/lib/auth";
 import { daysBetween, fmtDate, fmtMonth, todayBangkok } from "@/lib/dates";
 
-type Params = { scope?: string; status?: string; service?: string; intake?: string; q?: string; sort?: string; dir?: string };
+type Params = { scope?: string; status?: string; service?: string; intake?: string; q?: string; sort?: string; dir?: string; deleted?: string };
 const STATUS: Record<string, string[]> = {
   active: ["not_started", "in_progress"], success: ["success"], fail: ["fail"],
 };
@@ -68,7 +68,7 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
   });
 
   const link = (over: Params) => {
-    const p = new URLSearchParams(Object.entries({ ...sp, ...over }).filter(([, v]) => v) as [string, string][]);
+    const p = new URLSearchParams(Object.entries({ ...sp, deleted: undefined, ...over }).filter(([, v]) => v) as [string, string][]);
     return `/cases?${p}`;
   };
   const tab = (on: boolean) => on ? "rounded-md bg-white px-3 py-1.5 font-semibold text-slate-900 shadow-sm" : "rounded-md px-3 py-1.5 text-slate-600 hover:text-slate-900";
@@ -79,6 +79,7 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
         <h1 className="text-2xl font-semibold text-slate-900">Cases</h1>
         <Link href="/cases/new" className="rounded-lg bg-navy px-4 py-2 text-sm font-medium text-white hover:bg-navy-dark">+ New case</Link>
       </div>
+      {sp.deleted && <p role="status" className="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">Case deleted.</p>}
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex gap-1 rounded-lg bg-slate-200 p-1 text-sm">
