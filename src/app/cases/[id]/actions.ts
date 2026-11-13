@@ -182,3 +182,20 @@ export async function deleteCase(fd: FormData) {
   revalidatePath("/", "layout");
   redirect("/cases?deleted=1");
 }
+
+export async function updateTask(fd: FormData) {
+  const { supabase } = await getMe();
+  const caseId = s(fd, "case_id")!;
+  if (!s(fd, "title")) return back(caseId, "Write what needs to be done");
+  const r = await supabase.from("tasks").update({
+    title: s(fd, "title"), due_date: s(fd, "due_date") ?? todayBangkok(), assigned_to: s(fd, "assigned_to"),
+  }).eq("id", s(fd, "task_id")!).select("id");
+  back(caseId, changed(r));
+}
+
+export async function deleteTask(fd: FormData) {
+  const { supabase } = await getMe();
+  const caseId = s(fd, "case_id")!;
+  const r = await supabase.from("tasks").delete().eq("id", s(fd, "task_id")!).select("id");
+  back(caseId, changed(r));
+}

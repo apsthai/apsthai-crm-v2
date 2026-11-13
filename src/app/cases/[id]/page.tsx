@@ -9,7 +9,7 @@ import { UndoButton } from "@/components/undo-success";
 import { getMe } from "@/lib/auth";
 import { daysBetween, fmtDate, fmtMonth, todayBangkok } from "@/lib/dates";
 import { fmtTHB } from "@/lib/money";
-import { addFeedback, updateApplication, addStaff, addTask, closeLost, endStaff, reopenCase, setResult, toggleTask, updateCase, updateStudent, deleteCase } from "./actions";
+import { addFeedback, updateApplication, addStaff, addTask, closeLost, endStaff, reopenCase, setResult, toggleTask, updateCase, updateStudent, deleteCase, updateTask, deleteTask } from "./actions";
 import { AddSchool } from "./add-school";
 import { ResultSelect } from "./result-select";
 import { type ChipState, StageChip } from "./stage-chip";
@@ -77,6 +77,14 @@ export default async function CasePage({ params, searchParams }: {
   const { data: resultLog } = appIds.length
     ? await sb.from("change_log").select("row_id, new_value, changed_at, changed_by").eq("table_name", "applications").eq("field", "result").in("row_id", appIds)
     : { data: [] };
+  // Task edits and deletes (deleted tasks are found by their case in the logged row).
+  const taskIds = ((tasks.data ?? []) as { id: string }[]).map((t) => t.id);
+  const [taskEditLog, taskDelLog] = await Promise.all([
+    taskIds.length
+      ? sb.from("change_log").select("row_id, field, old_value, new_value, changed_at, changed_by").eq("table_name", "tasks").eq("action", "update").in("field", ["title", "due_date", "assigned_to"]).in("row_id", taskIds)
+      : Promise.resolve({ data: [] }),
+    sb.from("change_log").select("old_value, changed_at, changed_by").eq("table_name", "tasks").eq("action", "delete").like("old_value", `%"case_id": "${id}"%`),
+  ]);
   const { data: revertLog } = await sb.from("change_log").select("changed_at, changed_by").eq("table_name", "cases").eq("action", "revert").eq("row_id", id);
   const { data: fb } = appIds.length
     ? await sb.from("feedback").select("id, application_id, date, feedback, action, created_at, created_by").in("application_id", appIds).order("date", { ascending: false })
@@ -138,6 +146,16 @@ export default async function CasePage({ params, searchParams }: {
     ...((revertLog ?? []) as { changed_at: string; changed_by: string | null }[])
       .map((l) => ({ at: l.changed_at, by: l.changed_by, what: "Success undone, case back in progress" })),
     ...taskRows.map((t) => ({ at: t.created_at, by: t.created_by, what: `Task added: ${t.title}` })),
+    ...((taskEditLog.data ?? []) as { row_id: string; field: string; old_value: string | null; new_value: string | null; changed_at: string; changed_by: string | null }[])
+      .map((l) => {
+        const title = taskRows.find((t) => t.id === l.row_id)?.title ?? "task";
+        const what = l.field === "title" ? `Task renamed: ${l.old_value ?? ""} → ${l.new_value ?? ""}`
+          : l.field === "due_date" ? `Task "${title}" moved to ${l.new_value ? fmtDate(l.new_value) : "-"}`
+          : `Task "${title}" given to ${l.new_value ? who.get(l.new_value) ?? "someone" : "-"}`;
+        return { at: l.changed_at, by: l.changed_by, what };
+      }),
+    ...((taskDelLog.data ?? []) as { old_value: string | null; changed_at: string; changed_by: string | null }[])
+      .map((l) => { let title = "task"; try { title = JSON.parse(l.old_value ?? "{}").title ?? title; } catch { /* keep */ } return { at: l.changed_at, by: l.changed_by, what: `Task deleted: ${title}` }; }),
     ...doneTasks.map((t) => ({ at: t.done_at!, by: t.done_by, what: `Task done: ${t.title}` })),
     ...fbRows.map((f) => ({ at: f.created_at, by: f.created_by, what: `Feedback on ${appName(appById.get(f.application_id))}: ${f.feedback}` })),
     ...linkRows.map((l) => ({ at: l.created_at, by: null, what: `${who.get(l.staff_id)} assigned to the case from ${fmtDate(l.start_date)}` })),
@@ -328,19 +346,47 @@ export default async function CasePage({ params, searchParams }: {
                 const late = !t.done_at && t.due_date < today;
                 const due = t.done_at ? `Done ${fmtDate(t.done_at.slice(0, 10))}` : t.due_date === today ? "Today" : late ? `${daysBetween(t.due_date, today)} days late` : fmtDate(t.due_date);
                 const mayTick = canEdit || (open && t.assigned_to === me.id);
+                const people = [...new Set([...assignable, ...(t.assigned_to ? [t.assigned_to] : [])])];
                 return (
-                  <form key={t.id} action={toggleTask} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-100 py-2.5 text-sm">
-                    <input type="hidden" name="case_id" value={id} />
-                    <input type="hidden" name="task_id" value={t.id} />
-                    <input type="hidden" name="done" value={t.done_at ? "0" : "1"} />
-                    <button type="submit" disabled={!mayTick} aria-label={t.done_at ? `Mark "${t.title}" as not done` : `Mark "${t.title}" as done`}
-                      className={`flex size-5 items-center justify-center rounded border text-xs ${t.done_at ? "border-navy bg-navy text-white" : "border-slate-400 bg-white"} ${mayTick ? "hover:border-navy" : "opacity-50"}`}>
-                      {t.done_at ? "✓" : ""}
-                    </button>
+                  <div key={t.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-slate-100 py-2.5 text-sm">
+                    <form action={toggleTask} className="contents">
+                      <input type="hidden" name="case_id" value={id} />
+                      <input type="hidden" name="task_id" value={t.id} />
+                      <input type="hidden" name="done" value={t.done_at ? "0" : "1"} />
+                      <button type="submit" disabled={!mayTick} aria-label={t.done_at ? `Mark "${t.title}" as not done` : `Mark "${t.title}" as done`}
+                        className={`flex size-5 items-center justify-center rounded border text-xs ${t.done_at ? "border-navy bg-navy text-white" : "border-slate-400 bg-white"} ${mayTick ? "hover:border-navy" : "opacity-50"}`}>
+                        {t.done_at ? "✓" : ""}
+                      </button>
+                    </form>
                     <span className={`min-w-0 flex-[1_1_240px] ${t.done_at ? "text-slate-400 line-through" : ""}`}>{t.title}</span>
                     <span className={`text-[13px] ${late ? "font-semibold text-brand-red" : t.due_date === today && !t.done_at ? "font-semibold text-navy" : "text-slate-500"}`}>{due}</span>
                     <span className="w-16 text-[13px] text-slate-500">{t.assigned_to ? who.get(t.assigned_to) : ""}</span>
-                  </form>
+                    {canEdit && (
+                      // The key changes after a save, so the popover comes back closed.
+                      <details key={`${t.title}|${t.due_date}|${t.assigned_to}`} className="relative">
+                        <summary className="cursor-pointer list-none rounded px-1.5 text-[13px] text-navy hover:underline">Edit</summary>
+                        <div className="absolute right-0 z-20 mt-2 flex w-80 flex-col gap-2.5 rounded-xl border border-slate-200 bg-white p-4 shadow-lg">
+                          <form action={updateTask} className="flex flex-col gap-2.5">
+                            <input type="hidden" name="case_id" value={id} />
+                            <input type="hidden" name="task_id" value={t.id} />
+                            <Field label="Task"><input name="title" required defaultValue={t.title} className={inputCls} /></Field>
+                            <div className="flex flex-col gap-1"><span className="text-[13px] font-medium text-slate-600">Due date</span><DatePick name="due_date" defaultValue={t.due_date} label="Due date" /></div>
+                            <Field label="Who does it">
+                              <select name="assigned_to" defaultValue={t.assigned_to ?? ""} className={inputCls}>
+                                {people.map((sid) => <option key={sid} value={sid}>{who.get(sid)}</option>)}
+                              </select>
+                            </Field>
+                            <Submit>Save</Submit>
+                          </form>
+                          <form action={deleteTask} className="border-t border-slate-100 pt-2.5">
+                            <input type="hidden" name="case_id" value={id} />
+                            <input type="hidden" name="task_id" value={t.id} />
+                            <Submit variant="danger" className="w-full">Delete task</Submit>
+                          </form>
+                        </div>
+                      </details>
+                    )}
+                  </div>
                 );
               })}
             </div>
