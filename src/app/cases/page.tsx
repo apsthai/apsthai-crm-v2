@@ -13,7 +13,8 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
   const sp = await searchParams;
   const { supabase: sb, me } = await getMe();
   const today = todayBangkok();
-  const scope = sp.scope === "all" ? "all" : "mine";
+  // Admin looks after the whole company, so their list opens on All cases; staff open on My cases.
+  const scope = sp.scope === "all" || sp.scope === "mine" ? sp.scope : me.role === "admin" ? "all" : "mine";
   const status = sp.status && STATUS[sp.status] ? sp.status : "active";
 
   const [casesRes, catsRes, mineRes] = await Promise.all([
