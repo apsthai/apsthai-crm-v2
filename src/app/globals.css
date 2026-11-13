@@ -16,3 +16,8 @@ body {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(300%); }
 }
+
+/* Printing a page (payout statement, invoice): leave out the menu and buttons. */
+@media print {
+  body > div > header, .no-print { display: none !important; }
+}
