@@ -37,7 +37,7 @@ export function MoneyIn({ invoiceId, invoiceNo, payer, currency, whtPct, lines, 
       <input type="hidden" name="wht_thb" value={wht} />
       <input type="hidden" name="part" value={part ? "1" : ""} />
       <input type="hidden" name="lines" value={part ? JSON.stringify(paying.map((l) => ({ receivable_id: l.receivableId, amount: round2(l.pay) }))) : ""} />
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="flex flex-wrap gap-3 [&>*]:flex-[1_1_210px]">
         <Field label="Date in the bank">
           <DateWatch onChange={setDate}><DatePick name="date" defaultValue={today} label="Date in the bank" /></DateWatch>
         </Field>
