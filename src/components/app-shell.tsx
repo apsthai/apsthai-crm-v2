@@ -34,7 +34,7 @@ export async function AppShell({ active, children }: { name?: string; active: st
             ))}
           </nav>
           <div className="flex items-center gap-3 text-sm text-slate-600">
-            <span>{me.codename}</span>
+            <Link href="/account" className="hover:text-navy hover:underline" title="My account · change password">{me.codename}</Link>
             <form action="/auth/signout" method="post">
               <button className="rounded-lg border border-slate-300 px-3 py-1.5 text-[13px] hover:border-navy hover:text-navy">Sign out</button>
             </form>
