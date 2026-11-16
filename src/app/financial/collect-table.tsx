@@ -185,17 +185,17 @@ function EditPanel({ row, inAWeek, onClose }: { row: Row; inAWeek: string; onClo
         </div>
       </form>
       <div className="flex flex-[1_1_200px] flex-col gap-2 border-slate-200 text-sm sm:border-l sm:pl-6">
-        <span className="font-medium text-slate-700">{row.byHand ? "Added by mistake?" : "Not going to bill this?"}</span>
+        <span className="font-medium text-slate-700">{row.canDelete ? "Added by mistake?" : "Not going to bill this?"}</span>
         {!sure ? (
           <button type="button" onClick={() => setSure(true)}
             className="self-start rounded-lg border border-red-300 px-3 py-1.5 text-[13px] text-brand-red hover:bg-red-50">
-            {row.byHand ? "Delete this amount" : "Not collecting"}
+            {row.canDelete ? "Delete this amount" : "Not collecting"}
           </button>
         ) : (
-          <form action={row.byHand ? deleteReceivable : dropReceivable} className="flex flex-col gap-2">
+          <form action={row.canDelete ? deleteReceivable : dropReceivable} className="flex flex-col gap-2">
             <input type="hidden" name="id" value={row.id} />
             <span className="text-[13px] text-slate-600">
-              {row.byHand ? `Delete ${row.student}'s amount? This cannot be undone.` : `Take ${row.student} off the list?`}
+              {row.canDelete ? `Delete ${row.student}'s amount? This cannot be undone.` : `Take ${row.student} off the list?`}
             </span>
             <div className="flex gap-2">
               <Submit variant="danger">Yes</Submit>

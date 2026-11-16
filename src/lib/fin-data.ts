@@ -10,7 +10,7 @@ export async function latestRates(sb: SupabaseClient) {
   return m;
 }
 
-export const RV_SELECT = `id, type, amount, currency, status, created_at, case_id, follow_up_on, follow_up_note,
+export const RV_SELECT = `id, type, amount, currency, status, created_at, case_id, follow_up_on, follow_up_note, invoice_lines(id),
   term:income_terms(rate_pct, amount),
   app:applications(programme, commissionable_fee, currency, product:products(school_id, school:schools(name))),
   kase:cases(id, intake, category_id, sub_agent_pct, partner:partners!cases_sub_agent_id_fkey(name),
@@ -22,7 +22,7 @@ const one = <T,>(x: One<T>): T | null => (Array.isArray(x) ? x[0] ?? null : x);
 
 export type RvRaw = {
   id: string; type: string; amount: number; currency: string; status: string; created_at: string; case_id: string;
-  follow_up_on: string | null; follow_up_note: string | null;
+  follow_up_on: string | null; follow_up_note: string | null; invoice_lines?: { id: string }[];
   term: One<{ rate_pct: number | null; amount: number | null }>;
   app: One<{ programme: string | null; commissionable_fee: number | null; currency: string | null;
     product: One<{ school_id: string | null; school: One<{ name: string }> }> }>;
@@ -34,7 +34,7 @@ export type RvRaw = {
 export type Rv = {
   id: string; type: string; amount: number; currency: string; status: string; createdAt: string; caseId: string;
   student: string; fullName: string; school: string; schoolId: string | null; programme: string; service: string;
-  how: string; byHand: boolean; staff: string[]; followUpOn: string | null; followUpNote: string | null; categoryId: string; intake: string | null; partner: string | null; partnerPct: number; defaultText: string;
+  how: string; byHand: boolean; canDelete: boolean; staff: string[]; followUpOn: string | null; followUpNote: string | null; categoryId: string; intake: string | null; partner: string | null; partnerPct: number; defaultText: string;
 };
 
 // Flattens a receivable row for display and builds the default text for an invoice line.
@@ -57,6 +57,8 @@ export function flatRv(r: RvRaw): Rv {
     id: r.id, type: r.type, amount: Number(r.amount), currency: r.currency, status: r.status, createdAt: r.created_at,
     caseId: r.case_id, student: st?.codename ?? "", fullName, school, schoolId: product?.school_id ?? null, programme,
     service: one(k?.category ?? null)?.name_en ?? "", how, byHand: !term,
+    // Once an amount has been on an invoice (even a cancelled one) it stays on record: Not collecting, not delete.
+    canDelete: !term && !(r.invoice_lines ?? []).length,
     staff: (k?.case_staff ?? []).filter((c) => !c.end_date).sort((a, b) => a.created_at.localeCompare(b.created_at))
       .map((c) => one(c.staff)?.codename ?? "").filter(Boolean),
     followUpOn: r.follow_up_on, followUpNote: r.follow_up_note,
