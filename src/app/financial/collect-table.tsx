@@ -96,7 +96,9 @@ export function CollectTable({ rows, addByHand, today, inAWeek }:
                         <span className={`text-xs font-semibold ${due(r) ? "text-brand-red" : "text-slate-600"}`}>{due(r) ? "Due " : ""}{fmtDate(r.followUpOn)}</span>
                         {r.followUpNote && <span className="block truncate text-xs text-slate-500" title={r.followUpNote}>{r.followUpNote}</span>}
                       </span>
-                    ) : <span className="text-xs text-slate-400">-</span>}
+                    ) : r.followUpNote
+                      ? <span className="block max-w-[200px] truncate text-xs text-slate-500" title={r.followUpNote}>{r.followUpNote}</span>
+                      : <span className="text-xs text-slate-400">-</span>}
                   </td>
                   <td className="border-b border-slate-100 px-4 py-2.5 text-right">
                     <button type="button" onClick={() => setEditing(open ? null : r.id)} aria-expanded={open}
