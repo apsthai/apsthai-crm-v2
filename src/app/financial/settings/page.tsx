@@ -57,6 +57,15 @@ export default async function SettingsPage({ searchParams }: { searchParams: Pro
             {input("bank_swift", "SWIFT code")}
             {input("bank_address", "Bank address", "sm:col-span-2")}
           </div>
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">ภาษาไทย (ใบแจ้งหนี้ลูกค้าในไทย)</h3>
+            <p className="mt-0.5 text-[13px] text-slate-500">Left blank, the Thai invoice uses the English details above. The account number is the same.</p>
+          </div>
+          <div className="grid gap-3 sm:grid-cols-2">
+            {input("bank_account_name_th", "ชื่อบัญชี")}
+            {input("bank_name_th", "ธนาคาร")}
+            {input("bank_branch_th", "สาขา")}
+          </div>
           <div className="flex justify-end"><Submit>Save</Submit></div>
         </section>
       </form>

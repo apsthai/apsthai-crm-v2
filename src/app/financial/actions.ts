@@ -200,7 +200,8 @@ export async function markPaid(fd: FormData) {
 export async function saveSettings(fd: FormData) {
   const sb = await admin();
   const keys = ["name_en", "name_th", "address_en", "address_th", "phone", "email", "tax_id",
-    "bank_account_name", "bank_name", "bank_branch", "bank_address", "bank_account_no", "bank_swift"];
+    "bank_account_name", "bank_name", "bank_branch", "bank_address", "bank_account_no", "bank_swift",
+    "bank_account_name_th", "bank_name_th", "bank_branch_th"];
   const row = Object.fromEntries(keys.map((k) => [k, s(fd, k)]));
   const { error } = await sb.from("company_settings").update(row).eq("single", true);
   back("/financial/settings", error);

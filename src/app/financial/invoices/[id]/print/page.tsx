@@ -39,7 +39,10 @@ export default async function PrintInvoice({ params }: { params: Promise<{ id: s
     : { title: "INVOICE", billTo: "BILL TO", no: "Invoice No.", date: "Date", taxId: "Tax ID", item: "No.", desc: "Transaction", cur: "Currency", amount: "Amount",
         pay: "PAYMENT DETAILS", accName: "Account Name", bank: "Bank", branch: "Branch", bankAddr: "Bank Address", accNo: "Account Number", swift: "SWIFT Code",
         tel: "Tel", ref: `Please quote ${no} as the payment reference.` };
-  const bank = [[L.accName, c.bank_account_name], [L.bank, c.bank_name], [L.branch, c.bank_branch], [L.bankAddr, th ? null : c.bank_address],
+  // A Thai invoice uses the Thai bank details when they are filled in.
+  const thOr = (thKey: string, enKey: string) => (th && c[thKey] ? c[thKey] : c[enKey]);
+  const bank = [[L.accName, thOr("bank_account_name_th", "bank_account_name")], [L.bank, thOr("bank_name_th", "bank_name")],
+    [L.branch, thOr("bank_branch_th", "bank_branch")], [L.bankAddr, th ? null : c.bank_address],
     [L.accNo, c.bank_account_no], [L.swift, th ? null : c.bank_swift]].filter(([, v]) => v);
   const blank = Math.max(0, 6 - lines.length);
   const cell = { padding: "5px 8px", border: "1px solid #e5e7eb" } as const;
