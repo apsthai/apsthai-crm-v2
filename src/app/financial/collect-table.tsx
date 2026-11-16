@@ -227,7 +227,7 @@ function CasePicker({ cases }: { cases: CaseOption[] }) {
   );
 }
 
-export function AddByHand({ cases, fixedCase, inAWeek, backTo, label = "+ Add an amount by hand", up = true }:
+export function AddByHand({ cases, fixedCase, inAWeek, backTo, label = "+ Add an amount by hand", up = false }:
   { cases?: CaseOption[]; fixedCase?: string; inAWeek: string; backTo?: string; label?: string; up?: boolean }) {
   return (
     <details className="relative">

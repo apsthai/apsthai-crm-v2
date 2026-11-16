@@ -510,7 +510,7 @@ export default async function CasePage({ params, searchParams }: {
               )}
               {isAdmin && (
                 <div className="flex justify-end pt-3">
-                  <AddByHand fixedCase={kase.id} backTo={`/cases/${kase.id}`} inAWeek={addDays(todayBangkok(), 7)} label="+ Add an amount" up={false} />
+                  <AddByHand fixedCase={kase.id} backTo={`/cases/${kase.id}`} inAWeek={addDays(todayBangkok(), 7)} label="+ Add an amount" />
                 </div>
               )}
             </Card>
