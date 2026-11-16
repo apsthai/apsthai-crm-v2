@@ -9,12 +9,16 @@ import { createCase, type NewCaseState } from "./actions";
 
 export type StudentOption = {
   id: string; codename: string; nickname: string; firstname: string | null; lastname: string | null; cases: string[];
+  caseKeys: { id: string; categoryId: string; intake: string; status: string; label: string }[];
 };
 type Opt = { id: string; name_en: string };
 
 const RELATIONS = [["mother", "Mother"], ["father", "Father"], ["guardian", "Guardian"], ["student", "Student"], ["other", "Other"]];
 const APPLICANTS = [["student", "Student"], ["father", "Father"], ["mother", "Mother"], ["guardian", "Guardian"], ["other", "Other"]];
 const norm = (v: string | null) => (v ?? "").trim().toLowerCase();
+// Codenames are "Nickname (Firstname)", so a nickname with brackets shows the first name twice.
+const BRACKETS = /[()（）]/;
+const STATUS_WORD: Record<string, string> = { success: "Successful", fail: "Lost", in_progress: "In progress", not_started: "Not started" };
 
 function Box({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
   return (
@@ -46,6 +50,7 @@ export function NewCaseForm({ students, services, channels, staff, me, thisYear 
   const [picked, setPicked] = useState<StudentOption | null>(null);
   const [st, setSt] = useState({ nickname: "", firstname: "", lastname: "", relation: "mother", phone: "", line: "" });
   const [allowDup, setAllowDup] = useState(false);
+  const [allowSameCase, setAllowSameCase] = useState(false);
   const [cs, setCs] = useState({
     category_id: "", intake: "", lead_channel_id: "", applicant: "student", applicant_name: "", referred_by: "",
     staff1: staff.some((x) => x.id === me.id) ? me.id : "", staff2: "",
@@ -55,10 +60,14 @@ export function NewCaseForm({ students, services, channels, staff, me, thisYear 
     [s.codename, s.nickname, s.firstname, s.lastname].some((v) => norm(v).includes(norm(q)))).slice(0, 8);
   const dups = mode === "new" && norm(st.firstname) ? students.filter((s) => norm(s.firstname) === norm(st.firstname)) : [];
   const staff1 = me.isAdmin ? cs.staff1 : me.id;
-  const ready = (mode === "pick" ? !!picked : !!st.nickname.trim() && !!st.firstname.trim() && (dups.length === 0 || allowDup))
-    && !!cs.category_id && /^\d{4}-\d{2}$/.test(cs.intake);
+  const badNick = mode === "new" && BRACKETS.test(st.nickname);
+  // The same student already has a case for this service and intake (often an imported case the staff did not see).
+  const sameCase = mode === "pick" && picked && cs.category_id && /^\d{4}-\d{2}$/.test(cs.intake)
+    ? picked.caseKeys.find((c) => c.categoryId === cs.category_id && c.intake === cs.intake) : undefined;
+  const ready = (mode === "pick" ? !!picked : !!st.nickname.trim() && !badNick && !!st.firstname.trim() && (dups.length === 0 || allowDup))
+    && !!cs.category_id && /^\d{4}-\d{2}$/.test(cs.intake) && (!sameCase || allowSameCase);
 
-  const choose = (s: StudentOption) => { setPicked(s); setMode("pick"); setQ(""); };
+  const choose = (s: StudentOption) => { setPicked(s); setMode("pick"); setQ(""); setAllowSameCase(false); };
   const upd = (k: keyof typeof st) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setSt({ ...st, [k]: e.target.value });
   const updC = (k: keyof typeof cs) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => setCs({ ...cs, [k]: e.target.value });
 
@@ -97,7 +106,10 @@ export function NewCaseForm({ students, services, channels, staff, me, thisYear 
         {mode === "new" && (
           <div className="grid gap-3">
             <div className="grid gap-3 sm:grid-cols-3">
-              <Field label="Nickname *"><input name="nickname" value={st.nickname} onChange={upd("nickname")} className={inputCls} required /></Field>
+              <Field label="Nickname *">
+                <input name="nickname" value={st.nickname} onChange={upd("nickname")} className={inputCls} required placeholder="e.g. Tara" aria-invalid={badNick} />
+                {badNick && <span role="alert" className="text-[13px] text-brand-red">Nickname only, no brackets. The first name is added by itself: &quot;Tara (Thongtara)&quot;.</span>}
+              </Field>
               <Field label="First name *"><input name="firstname" value={st.firstname} onChange={(e) => { upd("firstname")(e); setAllowDup(false); }} className={inputCls} required /></Field>
               <Field label="Last name"><input name="lastname" value={st.lastname} onChange={upd("lastname")} className={inputCls} /></Field>
             </div>
@@ -140,15 +152,27 @@ export function NewCaseForm({ students, services, channels, staff, me, thisYear 
       <Box title="2. Case">
         <div className="grid gap-3 sm:grid-cols-2">
           <Field label="Service *">
-            <select name="category_id" value={cs.category_id} onChange={updC("category_id")} className={inputCls} required>
+            <select name="category_id" value={cs.category_id} onChange={(e) => { updC("category_id")(e); setAllowSameCase(false); }} className={inputCls} required>
               <option value="">Choose…</option>
               {services.map((c) => <option key={c.id} value={c.id}>{c.name_en}</option>)}
             </select>
           </Field>
           <div className="flex min-w-0 flex-col gap-1">
             <span className="text-[13px] font-medium text-slate-600">Intake (month and year) *</span>
-            <MonthPick name="intake" label="Intake" value={cs.intake} onChange={(v) => setCs({ ...cs, intake: v })} around={thisYear} required />
+            <MonthPick name="intake" label="Intake" value={cs.intake} onChange={(v) => { setCs({ ...cs, intake: v }); setAllowSameCase(false); }} around={thisYear} required />
           </div>
+          {sameCase && (
+            <div role="alert" className="grid gap-2 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm sm:col-span-2">
+              <p className="font-medium text-amber-900">
+                {picked?.codename} already has a {sameCase.label} case ({STATUS_WORD[sameCase.status] ?? sameCase.status}).{" "}
+                <Link href={`/cases/${sameCase.id}`} className="underline" target="_blank">Open that case</Link> and update it there.
+              </p>
+              <label className="flex items-center gap-2 text-amber-900">
+                <input type="checkbox" checked={allowSameCase} onChange={(e) => setAllowSameCase(e.target.checked)} />
+                This is a different case. Create it anyway.
+              </label>
+            </div>
+          )}
           <Field label="Lead source">
             <select name="lead_channel_id" value={cs.lead_channel_id} onChange={updC("lead_channel_id")} className={inputCls}>
               <option value="">-</option>

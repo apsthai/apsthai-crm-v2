@@ -12,6 +12,7 @@ import { fmtTHB } from "@/lib/money";
 import { addFeedback, updateApplication, addStaff, addTask, closeLost, endStaff, reopenCase, setResult, toggleTask, updateCase, updateStudent, deleteCase, updateTask, deleteTask } from "./actions";
 import { AddSchool } from "./add-school";
 import { ResultSelect } from "./result-select";
+import { SubAgentFields } from "./sub-agent-fields";
 import { type ChipState, StageChip } from "./stage-chip";
 
 const CURRENCIES = ["GBP", "THB", "USD", "EUR", "AUD", "NZD", "CAD", "SGD", "CHF"];
@@ -56,7 +57,7 @@ export default async function CasePage({ params, searchParams }: {
     sb.from("team_members").select("team_id").eq("staff_id", me.id),
     sb.from("products").select("id, school:schools(name, type, default_currency), partner:partners(name)").eq("category_id", kase.category_id).eq("active", true),
     sb.from("lead_channels").select("id, name_en").eq("active", true).order("sort_order"),
-    sb.from("partners").select("id, name").eq("active", true).order("name"),
+    sb.from("partners").select("id, name, default_share_pct").eq("active", true).order("name"),
     sb.from("stage_updates").select("id, application_id, stage_id, status, approval, approval_note, date, remark, created_at, created_by").eq("case_id", id).order("created_at", { ascending: false }),
     sb.from("cases").select("id, intake, overall_status, category:categories(name_en)").eq("student_id", kase.student.id).neq("id", id).order("intake"),
     sb.from("education").select("academic_year, school:schools(name), level:levels(name_en)").eq("student_id", kase.student.id).order("academic_year", { ascending: false }).limit(1),
@@ -454,15 +455,10 @@ export default async function CasePage({ params, searchParams }: {
                   </Field>
                   <Field label="Client name (if not the student)"><input name="applicant_name" defaultValue={kase.applicant_name ?? ""} className={inputCls} /></Field>
                   <Field label="Referred by"><input name="referred_by" defaultValue={kase.referred_by ?? ""} className={inputCls} /></Field>
-                  <div className="flex gap-2">
-                    <Field label="Sub-agent" className="flex-1">
-                      <select name="sub_agent_id" defaultValue={kase.sub_agent_id ?? ""} className={inputCls}>
-                        <option value="">-</option>
-                        {(partners.data ?? []).map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                      </select>
-                    </Field>
-                    <Field label="Share %" className="w-24"><input name="sub_agent_pct" inputMode="decimal" defaultValue={kase.sub_agent_pct ?? ""} className={inputCls} /></Field>
-                  </div>
+                  {isAdmin && (
+                    <SubAgentFields partners={(partners.data ?? []) as { id: string; name: string; default_share_pct: number | null }[]}
+                      defaultId={kase.sub_agent_id} defaultPct={kase.sub_agent_pct} />
+                  )}
                   <Submit>Save</Submit>
                 </form>
               </details>
@@ -526,7 +522,7 @@ export default async function CasePage({ params, searchParams }: {
                 <form action={updateStudent} className="mt-3 flex flex-col gap-2.5">
                   <input type="hidden" name="case_id" value={id} />
                   <input type="hidden" name="student_id" value={kase.student.id} />
-                  <Field label="Nickname *"><input name="nickname" defaultValue={kase.student.nickname} required className={inputCls} /></Field>
+                  <Field label="Nickname *"><input name="nickname" defaultValue={kase.student.nickname} required pattern="[^\(\)（）]*" title="Nickname only, no brackets" className={inputCls} /></Field>
                   <Field label="First name *"><input name="firstname" defaultValue={kase.student.firstname ?? ""} required className={inputCls} /></Field>
                   <Field label="Last name"><input name="lastname" defaultValue={kase.student.lastname ?? ""} className={inputCls} /></Field>
                   <Field label="Contact person">

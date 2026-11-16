@@ -16,6 +16,7 @@ export async function createCase(_prev: NewCaseState, fd: FormData): Promise<New
   const { supabase } = await getMe();
   const isNew = s(fd, "mode") === "new";
   const intake = s(fd, "intake");
+  if (isNew && /[()（）]/.test(s(fd, "nickname") ?? "")) return { error: "Nickname only, no brackets" };
   const { data, error } = await supabase.rpc("create_case", {
     p_category_id: s(fd, "category_id"),
     p_intake: intake ? `${intake}-01` : null,

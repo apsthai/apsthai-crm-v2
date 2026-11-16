@@ -90,18 +90,19 @@ export async function toggleTask(fd: FormData) {
 }
 
 export async function updateCase(fd: FormData) {
-  const { supabase } = await getMe();
+  const { supabase, me } = await getMe();
   const caseId = s(fd, "case_id")!;
   const intake = s(fd, "intake");
   const subAgent = s(fd, "sub_agent_id");
+  // Sub-agent and share decide money paid out, so only Admin changes them.
+  if (me.role === "admin" && subAgent && !(n(fd, "sub_agent_pct")! > 0)) return back(caseId, "Enter the sub-agent's share %");
   const { data, error } = await supabase.from("cases").update({
     intake: intake ? `${intake}-01` : undefined,
     lead_channel_id: s(fd, "lead_channel_id"),
     applicant: s(fd, "applicant") ?? "student",
     applicant_name: s(fd, "applicant_name"),
     referred_by: s(fd, "referred_by"),
-    sub_agent_id: subAgent,
-    sub_agent_pct: subAgent ? n(fd, "sub_agent_pct") : null,
+    ...(me.role === "admin" ? { sub_agent_id: subAgent, sub_agent_pct: subAgent ? n(fd, "sub_agent_pct") : null } : {}),
   }).eq("id", caseId).select("id");
   back(caseId, changed({ data, error }));
 }
@@ -153,6 +154,7 @@ export async function updateStudent(fd: FormData) {
   const caseId = s(fd, "case_id")!;
   const studentId = s(fd, "student_id")!;
   if (!s(fd, "nickname") || !s(fd, "firstname")) return back(caseId, "Enter the nickname and first name");
+  if (/[()（）]/.test(s(fd, "nickname")!)) return back(caseId, "Nickname only, no brackets");
   const r = await supabase.from("students").update({
     nickname: s(fd, "nickname"), firstname: s(fd, "firstname"), lastname: s(fd, "lastname"),
   }).eq("id", studentId).select("id");

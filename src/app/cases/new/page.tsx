@@ -7,7 +7,7 @@ import { NewCaseForm, type StudentOption } from "./new-case-form";
 export default async function NewCasePage() {
   const { supabase: sb, me } = await getMe();
   const [students, cats, channels, staff] = await Promise.all([
-    sb.from("students").select("id, codename, nickname, firstname, lastname, cases(intake, category:categories(name_en))")
+    sb.from("students").select("id, codename, nickname, firstname, lastname, cases(id, intake, overall_status, category_id, category:categories(name_en))")
       .is("merged_into", null).is("anonymized_at", null).order("codename"),
     sb.from("categories").select("id, name_en").eq("active", true).order("sort_order"),
     sb.from("lead_channels").select("id, name_en").eq("active", true).order("sort_order"),
@@ -16,10 +16,12 @@ export default async function NewCasePage() {
   if (students.error) throw new Error(students.error.message);
 
   type Row = { id: string; codename: string; nickname: string; firstname: string | null; lastname: string | null;
-    cases: { intake: string; category: { name_en: string } }[] };
+    cases: { id: string; intake: string; overall_status: string; category_id: string; category: { name_en: string } }[] };
   const options: StudentOption[] = ((students.data ?? []) as unknown as Row[]).map((r) => ({
     id: r.id, codename: r.codename, nickname: r.nickname, firstname: r.firstname, lastname: r.lastname,
     cases: r.cases.sort((a, b) => a.intake.localeCompare(b.intake)).map((c) => `${c.category.name_en} · ${fmtMonth(c.intake)}`),
+    caseKeys: r.cases.map((c) => ({ id: c.id, categoryId: c.category_id, intake: c.intake.slice(0, 7), status: c.overall_status,
+      label: `${c.category.name_en} · ${fmtMonth(c.intake)}` })),
   }));
 
   return (
