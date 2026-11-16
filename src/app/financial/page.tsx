@@ -83,8 +83,8 @@ export default async function CollectPage({ searchParams }: { searchParams: Prom
         ))}
       </div>
       {missing && <p className="text-xs text-amber-700">Some currencies have no exchange rate yet, so they count as zero above.</p>}
-      {/* A new key on every load closes any open edit panel after saving. */}
-      <CollectTable key={Date.now()} rows={rows.map((r) => ({ ...r, approved: fmtDate(r.createdAt.slice(0, 10)) }))}
+      {/* The key changes when any amount changes, so an open edit panel closes after saving. */}
+      <CollectTable key={rows.map((r) => [r.id, r.type, r.amount, r.currency, r.followUpOn, r.followUpNote].join(":")).join("|")} rows={rows.map((r) => ({ ...r, approved: fmtDate(r.createdAt.slice(0, 10)) }))}
         addByHand={<AddByHand cases={cases} inAWeek={addDays(today, 7)} />} today={today} inAWeek={addDays(today, 7)} />
       <p className="text-[13px] text-slate-500">
         An amount can be edited on the invoice. A student left out stays here for a later invoice. &quot;Add an amount by hand&quot; covers money
