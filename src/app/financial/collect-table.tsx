@@ -2,22 +2,28 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { DatePick } from "@/components/date-pick";
 import { Field, inputCls } from "@/components/fields";
 import { Submit } from "@/components/submit";
+import { fmtDate } from "@/lib/dates";
 import { money, n2 } from "@/lib/fin";
 import type { Rv } from "@/lib/fin-data";
-import { addReceivable, dropReceivable } from "./actions";
+import { addReceivable, dropReceivable, setFollowUp } from "./actions";
 
 type Row = Rv & { approved: string };
 const sel = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-navy";
 
-export function CollectTable({ rows, addByHand }: { rows: Row[]; addByHand: React.ReactNode }) {
+export function CollectTable({ rows, addByHand, today, inAWeek }:
+  { rows: Row[]; addByHand: React.ReactNode; today: string; inAWeek: string }) {
   const [school, setSchool] = useState("");
   const [cur, setCur] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
   const schools = useMemo(() => [...new Set(rows.map((r) => r.school || "No institution"))].sort(), [rows]);
   const currencies = useMemo(() => [...new Set(rows.map((r) => r.currency))].sort(), [rows]);
-  const shown = rows.filter((r) => (!school || (r.school || "No institution") === school) && (!cur || r.currency === cur));
+  const due = (r: Row) => !!r.followUpOn && r.followUpOn <= today;
+  // Follow-ups that are due come first, then the rest in the order they were added.
+  const shown = rows.filter((r) => (!school || (r.school || "No institution") === school) && (!cur || r.currency === cur))
+    .sort((a, b) => Number(due(b)) - Number(due(a)) || (due(a) && due(b) ? a.followUpOn!.localeCompare(b.followUpOn!) : 0));
   const chosen = rows.filter((r) => picked.includes(r.id));
   const pickedCur = chosen[0]?.currency;
   const total = chosen.reduce((s, r) => s + r.amount, 0);
@@ -54,18 +60,19 @@ export function CollectTable({ rows, addByHand }: { rows: Row[]; addByHand: Reac
               <th className="border-b border-slate-200 px-4 py-2.5 font-semibold">How it is worked out</th>
               <th className="border-b border-slate-200 px-4 py-2.5 text-right font-semibold">Amount</th>
               <th className="border-b border-slate-200 px-4 py-2.5 font-semibold">Staff</th>
+              <th className="border-b border-slate-200 px-4 py-2.5 font-semibold">Follow up</th>
               <th className="border-b border-slate-200 px-4 py-2.5"><span className="sr-only">Not collecting</span></th>
             </tr>
           </thead>
           <tbody>
             {shown.length === 0 && (
-              <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-500">Nothing to collect right now.</td></tr>
+              <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-500">Nothing to collect right now.</td></tr>
             )}
             {shown.map((r) => {
               const on = picked.includes(r.id);
               const blocked = !on && !!pickedCur && r.currency !== pickedCur;
               return (
-                <tr key={r.id} className={on ? "bg-navy-50/60" : ""}>
+                <tr key={r.id} className={on ? "bg-navy-50/60" : due(r) ? "bg-red-50/60" : ""}>
                   <td className="border-b border-slate-100 px-4 py-2.5">
                     <input type="checkbox" aria-label={`Pick ${r.student}`} checked={on} disabled={blocked} onChange={() => toggle(r.id)}
                       title={blocked ? `One invoice has one currency (${pickedCur})` : undefined} className="size-4 accent-navy" />
@@ -77,8 +84,11 @@ export function CollectTable({ rows, addByHand }: { rows: Row[]; addByHand: Reac
                   <td className="border-b border-slate-100 px-4 py-2.5">{[r.school, r.programme].filter(Boolean).join(" · ") || "-"}</td>
                   <td className="border-b border-slate-100 px-4 py-2.5 text-slate-600">{r.service}</td>
                   <td className="border-b border-slate-100 px-4 py-2.5 text-slate-600">{r.how}</td>
-                  <td className="border-b border-slate-100 px-4 py-2.5 text-right font-medium whitespace-nowrap">{money(r.amount, r.currency)}</td>
+                  <td className="border-b border-slate-100 px-4 py-2.5 text-right font-medium whitespace-nowrap">
+                    {r.amount ? money(r.amount, r.currency) : <span className="text-amber-700">{r.currency} · amount to confirm</span>}
+                  </td>
                   <td className="border-b border-slate-100 px-4 py-2.5 text-slate-600">{r.staff.join(", ")}</td>
+                  <td className="border-b border-slate-100 px-4 py-2.5"><FollowUp row={r} due={due(r)} inAWeek={inAWeek} /></td>
                   <td className="border-b border-slate-100 px-4 py-2.5 text-right">
                     <details className="relative inline-block">
                       <summary className="cursor-pointer list-none text-xs text-slate-500 hover:text-brand-red">Not collecting</summary>
@@ -115,9 +125,36 @@ export function CollectTable({ rows, addByHand }: { rows: Row[]; addByHand: Reac
   );
 }
 
+function FollowUp({ row, due, inAWeek }: { row: Row; due: boolean; inAWeek: string }) {
+  return (
+    <details className="relative">
+      <summary className="cursor-pointer list-none">
+        {row.followUpOn ? (
+          <span className="block max-w-[220px]">
+            <span className={`text-xs font-semibold ${due ? "text-brand-red" : "text-slate-600"}`}>{due ? "Due " : ""}{fmtDate(row.followUpOn)}</span>
+            {row.followUpNote && <span className="block truncate text-xs text-slate-500" title={row.followUpNote}>{row.followUpNote}</span>}
+          </span>
+        ) : <span className="text-xs text-navy hover:underline">+ Set</span>}
+      </summary>
+      <form action={setFollowUp} className="absolute right-0 z-10 mt-1 flex w-72 flex-col gap-2.5 rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
+        <input type="hidden" name="id" value={row.id} />
+        <Field label="Follow up on"><DatePick name="follow_up_on" defaultValue={row.followUpOn ?? inAWeek} label="Follow up on" /></Field>
+        <Field label="Note">
+          <textarea name="follow_up_note" rows={2} defaultValue={row.followUpNote ?? ""} className={inputCls}
+            placeholder="e.g. Asked the school for the amount on 14 Oct" />
+        </Field>
+        <div className="flex gap-2">
+          <Submit className="flex-1">Save</Submit>
+          {row.followUpOn && <Submit variant="ghost" name="clear" value="1">Clear</Submit>}
+        </div>
+      </form>
+    </details>
+  );
+}
+
 const CURS = ["GBP", "THB", "SGD", "USD", "AUD", "EUR", "NZD", "CAD", "CHF"];
 
-export function AddByHand({ cases }: { cases: { id: string; label: string }[] }) {
+export function AddByHand({ cases, inAWeek }: { cases: { id: string; label: string }[]; inAWeek: string }) {
   return (
     <details className="relative">
       <summary className="cursor-pointer list-none rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-navy hover:border-navy">
@@ -141,10 +178,14 @@ export function AddByHand({ cases }: { cases: { id: string; label: string }[] })
           <Field label="Currency">
             <select name="currency" className={inputCls} defaultValue="GBP">{CURS.map((c) => <option key={c}>{c}</option>)}</select>
           </Field>
-          <Field label="Amount">
-            <input name="amount" required inputMode="decimal" className={`${inputCls} text-right`} placeholder="0.00" />
+          <Field label="Amount (blank if not known yet)">
+            <input name="amount" inputMode="decimal" className={`${inputCls} text-right`} placeholder="0.00" />
           </Field>
         </div>
+        <Field label="Follow up on"><DatePick name="follow_up_on" defaultValue={inAWeek} label="Follow up on" /></Field>
+        <Field label="Note">
+          <textarea name="follow_up_note" rows={2} className={inputCls} placeholder="e.g. Waiting for the school to confirm the amount" />
+        </Field>
         <Submit>Add to the list</Submit>
       </form>
     </details>

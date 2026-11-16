@@ -10,7 +10,7 @@ export async function latestRates(sb: SupabaseClient) {
   return m;
 }
 
-export const RV_SELECT = `id, type, amount, currency, status, created_at, case_id,
+export const RV_SELECT = `id, type, amount, currency, status, created_at, case_id, follow_up_on, follow_up_note,
   term:income_terms(rate_pct, amount),
   app:applications(programme, commissionable_fee, currency, product:products(school_id, school:schools(name))),
   kase:cases(id, intake, category_id, sub_agent_pct, partner:partners!cases_sub_agent_id_fkey(name),
@@ -22,6 +22,7 @@ const one = <T,>(x: One<T>): T | null => (Array.isArray(x) ? x[0] ?? null : x);
 
 export type RvRaw = {
   id: string; type: string; amount: number; currency: string; status: string; created_at: string; case_id: string;
+  follow_up_on: string | null; follow_up_note: string | null;
   term: One<{ rate_pct: number | null; amount: number | null }>;
   app: One<{ programme: string | null; commissionable_fee: number | null; currency: string | null;
     product: One<{ school_id: string | null; school: One<{ name: string }> }> }>;
@@ -33,7 +34,7 @@ export type RvRaw = {
 export type Rv = {
   id: string; type: string; amount: number; currency: string; status: string; createdAt: string; caseId: string;
   student: string; fullName: string; school: string; schoolId: string | null; programme: string; service: string;
-  how: string; staff: string[]; categoryId: string; intake: string | null; partner: string | null; partnerPct: number; defaultText: string;
+  how: string; staff: string[]; followUpOn: string | null; followUpNote: string | null; categoryId: string; intake: string | null; partner: string | null; partnerPct: number; defaultText: string;
 };
 
 // Flattens a receivable row for display and builds the default text for an invoice line.
@@ -58,6 +59,7 @@ export function flatRv(r: RvRaw): Rv {
     service: one(k?.category ?? null)?.name_en ?? "", how,
     staff: (k?.case_staff ?? []).filter((c) => !c.end_date).sort((a, b) => a.created_at.localeCompare(b.created_at))
       .map((c) => one(c.staff)?.codename ?? "").filter(Boolean),
+    followUpOn: r.follow_up_on, followUpNote: r.follow_up_note,
     categoryId: k?.category_id ?? "", intake: k?.intake ?? null,
     partner: one(k?.partner ?? null)?.name ?? null, partnerPct: Number(k?.sub_agent_pct ?? 0), defaultText,
   };

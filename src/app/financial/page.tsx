@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { Flash } from "@/components/flash";
 import { getMe } from "@/lib/auth";
-import { addMonths, daysBetween, fmtDate, fmtMonth, monthStart, todayBangkok } from "@/lib/dates";
+import { addDays, addMonths, daysBetween, fmtDate, fmtMonth, monthStart, todayBangkok } from "@/lib/dates";
 import { flatRv, latestRates, RV_SELECT, type RvRaw } from "@/lib/fin-data";
 import { fmtTHB, toTHB } from "@/lib/money";
 import { FinHeader } from "./tabs";
@@ -41,6 +41,7 @@ export default async function CollectPage({ searchParams }: { searchParams: Prom
     waitingTHB += t.thb; missing ||= t.missing;
     if (daysBetween(i.date, today) > 30) over30++;
   }
+  const followDue = rows.filter((r) => r.followUpOn && r.followUpOn <= today).length;
   let notBilled = 0;
   for (const r of rows) { const t = toTHB(r.amount, r.currency, rates); notBilled += t.thb; missing ||= t.missing; }
   const moneyIn = (payRes.data ?? []).reduce((s, p) => s + Number(p.received_thb), 0);
@@ -51,7 +52,7 @@ export default async function CollectPage({ searchParams }: { searchParams: Prom
     .sort((a, b) => a.label.localeCompare(b.label));
 
   const tiles = [
-    ["Not billed yet", fmtTHB(notBilled), `${rows.length} ${rows.length === 1 ? "amount" : "amounts"} · incl. VAT, at today's rates`],
+    ["Not billed yet", fmtTHB(notBilled), `${rows.length} ${rows.length === 1 ? "amount" : "amounts"}${followDue ? ` · ${followDue} to follow up` : ""} · incl. VAT, at today's rates`],
     ["Billed, waiting for money", fmtTHB(waitingTHB), `${waiting.length} ${waiting.length === 1 ? "invoice" : "invoices"}${over30 ? ` · ${over30} over 30 days` : ""}`],
     ["Money in this month", fmtTHB(moneyIn), `${fmtMonth(today)} · ${(payRes.data ?? []).length} payments`],
   ];
@@ -71,7 +72,7 @@ export default async function CollectPage({ searchParams }: { searchParams: Prom
       </div>
       {missing && <p className="text-xs text-amber-700">Some currencies have no exchange rate yet, so they count as zero above.</p>}
       <CollectTable rows={rows.map((r) => ({ ...r, approved: fmtDate(r.createdAt.slice(0, 10)) }))}
-        addByHand={<AddByHand cases={cases} />} />
+        addByHand={<AddByHand cases={cases} inAWeek={addDays(today, 7)} />} today={today} inAWeek={addDays(today, 7)} />
       <p className="text-[13px] text-slate-500">
         An amount can be edited on the invoice. A student left out stays here for a later invoice. &quot;Add an amount by hand&quot; covers money
         that did not come from an approval, such as a second-year commission.

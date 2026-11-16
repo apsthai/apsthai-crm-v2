@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { AppShell, Bar, Card, SectionLabel, Tile } from "@/components/app-shell";
 import { getMe } from "@/lib/auth";
 import { cycleOf, fmtDate, fmtLongDate, fmtMonth, fmtMonthShort, hourBangkok, todayBangkok } from "@/lib/dates";
@@ -127,6 +128,10 @@ function AdminView({ admin, mine, today, cycle }: { admin: Admin; mine: Mine; to
             sub={a.payout ? `Commission, no VAT · pay ${fmtDate(a.payout.date)} · ${a.payout.people} payees · ${a.payout.reviewed} reviewed` : "No payout waiting"} />
           <Tile label="Active cases with no open task" value={String(a.noTask)} tone={a.noTask ? "red" : "ink"}
             sub="Nothing scheduled to do next" />
+          <Link href="/financial" className="contents">
+            <Tile label="Money to follow up" value={String(a.followUps)} tone={a.followUps ? "red" : "ink"}
+              sub={a.followUps ? "Reminder date reached · To collect" : "No reminders due"} />
+          </Link>
         </div>
       </section>
 

@@ -106,7 +106,7 @@ export async function loadCompany(sb: SupabaseClient, cycle: Cycle) {
 export async function loadAdmin(sb: SupabaseClient, today: string, cycle: Cycle) {
   const [rates, recv, pays, weighted, cats, payouts, pending, cases, openTasks, staff, links, pts, kpis] = await Promise.all([
     sb.from("v_latest_rate").select("currency, rate_thb"),
-    sb.from("receivables").select("amount, currency, expected_date, payment_lines(amount)").in("status", OPEN_RECEIVABLE),
+    sb.from("receivables").select("amount, currency, expected_date, status, follow_up_on, payment_lines(amount)").in("status", OPEN_RECEIVABLE),
     sb.from("payments").select("received_date, received_thb, vat_thb, wht_thb, revenue_ex_vat").gte("received_date", cycle.start).lte("received_date", cycle.end),
     sb.from("v_cashflow").select("month, category_id, amount_thb, case_id, missing_rate").eq("kind", "weighted"),
     sb.from("categories").select("id, name_en, sort_order"),
@@ -222,6 +222,9 @@ export async function loadAdmin(sb: SupabaseClient, today: string, cycle: Cycle)
       overdueTHB: overdue.reduce((a, r) => a + r.thb, 0),
       payout: nextPay ? { date: nextPay, total: round.reduce((a, p) => a + Number(p.total), 0), people: round.length, reviewed: round.filter((p) => p.status === "reviewed").length } : null,
       noTask,
+      // Amounts not billed yet whose reminder date has come (see Financial · To collect).
+      followUps: ((recv.data ?? []) as { status: string; follow_up_on: string | null }[])
+        .filter((r) => r.status === "expected" && r.follow_up_on && r.follow_up_on <= today).length,
     },
     money: {
       receivedMonth: sumPaid(received.filter((p) => p.received_date >= thisMonth)),

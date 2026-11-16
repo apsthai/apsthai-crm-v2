@@ -32,14 +32,26 @@ function back(path: string, error?: { message: string } | string | null): never 
 export async function addReceivable(fd: FormData) {
   const sb = await admin();
   const caseId = s(fd, "case_id");
-  const amount = num(fd, "amount");
-  if (!caseId || !amount) return back("/financial", "Choose a case and enter the amount");
+  // The amount may be unknown yet (we asked the school): it is left at 0 and shown as "Amount to confirm".
+  const amount = num(fd, "amount") ?? 0;
+  if (!caseId) return back("/financial", "Choose a case");
+  if (!(amount >= 0)) return back("/financial", "Enter the amount as a number, or leave it blank");
   const { data: app } = await sb.from("applications").select("id").eq("case_id", caseId).order("created_at").limit(1);
   const { error } = await sb.from("receivables").insert({
     type: s(fd, "type") ?? "commission", payer_type: "individual", payer_name: "To be billed",
     case_id: caseId, application_id: app?.[0]?.id ?? null, amount, currency: s(fd, "currency") ?? "GBP",
-    expected_date: todayBangkok(),
+    expected_date: todayBangkok(), follow_up_on: s(fd, "follow_up_on"), follow_up_note: s(fd, "follow_up_note"),
   });
+  back("/financial", error);
+}
+
+// A reminder on an amount to collect: what we are waiting for and when to chase it. "clear" removes it.
+export async function setFollowUp(fd: FormData) {
+  const sb = await admin();
+  const clear = fd.get("clear") === "1";
+  const { error } = await sb.from("receivables").update({
+    follow_up_on: clear ? null : s(fd, "follow_up_on"), follow_up_note: clear ? null : s(fd, "follow_up_note"),
+  }).eq("id", s(fd, "id")!);
   back("/financial", error);
 }
 
