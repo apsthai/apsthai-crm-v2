@@ -47,13 +47,14 @@ export async function addReceivable(fd: FormData) {
   back(backTo, error);
 }
 
-// Fix an amount still waiting to be billed: the amount (blank = to confirm), currency or type.
-export async function updateReceivable(fd: FormData) {
+// Save an amount still waiting to be billed: what it is, the amount (blank = to confirm), currency and the reminder.
+export async function saveReceivable(fd: FormData) {
   const sb = await admin();
   const amount = num(fd, "amount") ?? 0;
   if (!(amount >= 0)) return back("/financial", "Enter the amount as a number, or leave it blank");
   const { data, error } = await sb.from("receivables").update({
     amount, currency: s(fd, "currency") ?? "GBP", type: s(fd, "type") ?? "commission",
+    follow_up_on: s(fd, "follow_up_on"), follow_up_note: s(fd, "follow_up_note"),
   }).eq("id", s(fd, "id")!).eq("status", "expected").select("id");
   if (!error && !data?.length) return back("/financial", "This amount is already on an invoice, so change it there");
   back("/financial", error);
@@ -68,16 +69,6 @@ export async function deleteReceivable(fd: FormData) {
     ? "This amount was on an invoice before, so use Not collecting instead" : error.message);
   if (!data?.length) return back("/financial", "Only an amount added by hand and not billed yet can be deleted");
   back("/financial");
-}
-
-// A reminder on an amount to collect: what we are waiting for and when to chase it. "clear" removes it.
-export async function setFollowUp(fd: FormData) {
-  const sb = await admin();
-  const clear = fd.get("clear") === "1";
-  const { error } = await sb.from("receivables").update({
-    follow_up_on: clear ? null : s(fd, "follow_up_on"), follow_up_note: clear ? null : s(fd, "follow_up_note"),
-  }).eq("id", s(fd, "id")!);
-  back("/financial", error);
 }
 
 export async function dropReceivable(fd: FormData) {

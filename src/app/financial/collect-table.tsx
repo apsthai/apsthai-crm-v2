@@ -8,7 +8,7 @@ import { Submit } from "@/components/submit";
 import { fmtDate } from "@/lib/dates";
 import { money, n2 } from "@/lib/fin";
 import type { Rv } from "@/lib/fin-data";
-import { addReceivable, deleteReceivable, dropReceivable, setFollowUp, updateReceivable } from "./actions";
+import { addReceivable, deleteReceivable, dropReceivable, saveReceivable } from "./actions";
 
 type Row = Rv & { approved: string };
 const sel = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-navy";
@@ -18,6 +18,7 @@ export function CollectTable({ rows, addByHand, today, inAWeek }:
   const [school, setSchool] = useState("");
   const [cur, setCur] = useState("");
   const [picked, setPicked] = useState<string[]>([]);
+  const [editing, setEditing] = useState<string | null>(null);
   const schools = useMemo(() => [...new Set(rows.map((r) => r.school || "No institution"))].sort(), [rows]);
   const currencies = useMemo(() => [...new Set(rows.map((r) => r.currency))].sort(), [rows]);
   const due = (r: Row) => !!r.followUpOn && r.followUpOn <= today;
@@ -71,8 +72,9 @@ export function CollectTable({ rows, addByHand, today, inAWeek }:
             {shown.map((r) => {
               const on = picked.includes(r.id);
               const blocked = !on && !!pickedCur && r.currency !== pickedCur;
-              return (
-                <tr key={r.id} className={on ? "bg-navy-50/60" : due(r) ? "bg-red-50/60" : ""}>
+              const open = editing === r.id;
+              return [
+                <tr key={r.id} className={open ? "bg-slate-50" : on ? "bg-navy-50/60" : due(r) ? "bg-red-50/60" : ""}>
                   <td className="border-b border-slate-100 px-4 py-2.5">
                     <input type="checkbox" aria-label={`Pick ${r.student}`} checked={on} disabled={blocked} onChange={() => toggle(r.id)}
                       title={blocked ? `One invoice has one currency (${pickedCur})` : undefined} className="size-4 accent-navy" />
@@ -88,10 +90,29 @@ export function CollectTable({ rows, addByHand, today, inAWeek }:
                     {r.amount ? money(r.amount, r.currency) : <span className="text-amber-700">{r.currency} · amount to confirm</span>}
                   </td>
                   <td className="border-b border-slate-100 px-4 py-2.5 text-slate-600">{r.staff.join(", ")}</td>
-                  <td className="border-b border-slate-100 px-4 py-2.5"><FollowUp row={r} due={due(r)} inAWeek={inAWeek} /></td>
-                  <td className="border-b border-slate-100 px-4 py-2.5 text-right"><EditAmount row={r} /></td>
-                </tr>
-              );
+                  <td className="border-b border-slate-100 px-4 py-2.5">
+                    {r.followUpOn ? (
+                      <span className="block max-w-[200px]">
+                        <span className={`text-xs font-semibold ${due(r) ? "text-brand-red" : "text-slate-600"}`}>{due(r) ? "Due " : ""}{fmtDate(r.followUpOn)}</span>
+                        {r.followUpNote && <span className="block truncate text-xs text-slate-500" title={r.followUpNote}>{r.followUpNote}</span>}
+                      </span>
+                    ) : <span className="text-xs text-slate-400">-</span>}
+                  </td>
+                  <td className="border-b border-slate-100 px-4 py-2.5 text-right">
+                    <button type="button" onClick={() => setEditing(open ? null : r.id)} aria-expanded={open}
+                      className={`rounded-lg border px-3 py-1.5 text-[13px] ${open ? "border-navy bg-white text-navy" : "border-slate-300 bg-white text-navy hover:border-navy"}`}>
+                      {open ? "Close" : "Edit"}
+                    </button>
+                  </td>
+                </tr>,
+                open && (
+                  <tr key={`${r.id}-edit`} className="bg-slate-50">
+                    <td colSpan={9} className="border-b border-slate-200 px-4 pt-1 pb-4">
+                      <EditPanel row={r} inAWeek={inAWeek} onClose={() => setEditing(null)} />
+                    </td>
+                  </tr>
+                ),
+              ];
             })}
           </tbody>
         </table>
@@ -118,75 +139,70 @@ export function CollectTable({ rows, addByHand, today, inAWeek }:
 
 const CURRENCIES = ["GBP", "THB", "SGD", "USD", "AUD", "EUR", "NZD", "CAD", "CHF"];
 
-function EditAmount({ row }: { row: Row }) {
+// Everything about one amount in one place: what it is, how much, and when to chase it.
+function EditPanel({ row, inAWeek, onClose }: { row: Row; inAWeek: string; onClose: () => void }) {
+  const [remind, setRemind] = useState(!!row.followUpOn);
+  const [sure, setSure] = useState(false);
   return (
-    <details className="relative inline-block">
-      <summary className="cursor-pointer list-none text-xs text-navy hover:underline">Edit</summary>
-      <div className="absolute right-0 z-10 mt-1 flex w-72 flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left shadow-lg">
-        <form action={updateReceivable} className="flex flex-col gap-2.5">
-          <input type="hidden" name="id" value={row.id} />
+    <div className="flex flex-wrap items-start gap-x-6 gap-y-4 rounded-lg border border-slate-200 bg-white p-4">
+      <form action={saveReceivable} className="flex min-w-0 flex-[999_1_560px] flex-col gap-3">
+        <input type="hidden" name="id" value={row.id} />
+        <div className="grid gap-3 sm:grid-cols-[1.4fr_0.8fr_1fr]">
           <Field label="What it is">
             <select name="type" defaultValue={row.type} className={inputCls}>
               <option value="commission">Commission from a school</option>
               <option value="service_fee">Service fee</option>
             </select>
           </Field>
-          <div className="grid grid-cols-[96px_1fr] gap-2">
-            <Field label="Currency">
-              <select name="currency" defaultValue={row.currency} className={inputCls}>
-                {[...new Set([row.currency, ...CURRENCIES])].map((c) => <option key={c}>{c}</option>)}
-              </select>
-            </Field>
-            <Field label="Amount (blank = to confirm)">
-              <input name="amount" defaultValue={row.amount ? n2(row.amount) : ""} inputMode="decimal" className={`${inputCls} text-right`} />
-            </Field>
-          </div>
-          <Submit>Save</Submit>
-        </form>
-        <div className="border-t border-slate-200 pt-2.5">
-          {row.byHand ? (
-            <form action={deleteReceivable}>
-              <input type="hidden" name="id" value={row.id} />
-              <p className="mb-2 text-[13px] text-slate-600">Added by hand by mistake? Delete it.</p>
-              <Submit variant="danger" className="w-full">Delete this amount</Submit>
-            </form>
-          ) : (
-            <form action={dropReceivable}>
-              <input type="hidden" name="id" value={row.id} />
-              <p className="mb-2 text-[13px] text-slate-600">We will not bill this amount? Take it off the list.</p>
-              <Submit variant="danger" className="w-full">Not collecting</Submit>
-            </form>
-          )}
+          <Field label="Currency">
+            <select name="currency" defaultValue={row.currency} className={inputCls}>
+              {[...new Set([row.currency, ...CURRENCIES])].map((c) => <option key={c}>{c}</option>)}
+            </select>
+          </Field>
+          <Field label="Amount (blank = to confirm)">
+            <input name="amount" defaultValue={row.amount ? n2(row.amount) : ""} inputMode="decimal" className={`${inputCls} text-right`} />
+          </Field>
         </div>
-      </div>
-    </details>
-  );
-}
-
-function FollowUp({ row, due, inAWeek }: { row: Row; due: boolean; inAWeek: string }) {
-  return (
-    <details className="relative">
-      <summary className="cursor-pointer list-none">
-        {row.followUpOn ? (
-          <span className="block max-w-[220px]">
-            <span className={`text-xs font-semibold ${due ? "text-brand-red" : "text-slate-600"}`}>{due ? "Due " : ""}{fmtDate(row.followUpOn)}</span>
-            {row.followUpNote && <span className="block truncate text-xs text-slate-500" title={row.followUpNote}>{row.followUpNote}</span>}
-          </span>
-        ) : <span className="text-xs text-navy hover:underline">+ Set</span>}
-      </summary>
-      <form action={setFollowUp} className="absolute right-0 z-10 mt-1 flex w-72 flex-col gap-2.5 rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
-        <input type="hidden" name="id" value={row.id} />
-        <Field label="Follow up on"><DatePick name="follow_up_on" defaultValue={row.followUpOn ?? inAWeek} label="Follow up on" /></Field>
-        <Field label="Note">
-          <textarea name="follow_up_note" rows={2} defaultValue={row.followUpNote ?? ""} className={inputCls}
-            placeholder="e.g. Asked the school for the amount on 14 Oct" />
-        </Field>
+        <div className="grid gap-3 sm:grid-cols-[auto_1fr]">
+          <div className="flex flex-col gap-1.5">
+            <label className="flex items-center gap-2 text-sm font-medium text-slate-700">
+              <input type="checkbox" checked={remind} onChange={(e) => setRemind(e.target.checked)} className="size-4 accent-navy" />
+              Remind me on
+            </label>
+            {remind ? <DatePick name="follow_up_on" defaultValue={row.followUpOn ?? inAWeek} label="Follow up on" />
+              : <span className="py-2 text-sm text-slate-400">No reminder</span>}
+          </div>
+          <Field label="Note">
+            <input name="follow_up_note" defaultValue={row.followUpNote ?? ""} className={inputCls}
+              placeholder="e.g. Asked the school for the amount on 14 Oct" />
+          </Field>
+        </div>
         <div className="flex gap-2">
-          <Submit className="flex-1">Save</Submit>
-          {row.followUpOn && <Submit variant="ghost" name="clear" value="1">Clear</Submit>}
+          <Submit>Save</Submit>
+          <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600 hover:border-navy">Cancel</button>
         </div>
       </form>
-    </details>
+      <div className="flex flex-[1_1_200px] flex-col gap-2 border-slate-200 text-sm sm:border-l sm:pl-6">
+        <span className="font-medium text-slate-700">{row.byHand ? "Added by mistake?" : "Not going to bill this?"}</span>
+        {!sure ? (
+          <button type="button" onClick={() => setSure(true)}
+            className="self-start rounded-lg border border-red-300 px-3 py-1.5 text-[13px] text-brand-red hover:bg-red-50">
+            {row.byHand ? "Delete this amount" : "Not collecting"}
+          </button>
+        ) : (
+          <form action={row.byHand ? deleteReceivable : dropReceivable} className="flex flex-col gap-2">
+            <input type="hidden" name="id" value={row.id} />
+            <span className="text-[13px] text-slate-600">
+              {row.byHand ? `Delete ${row.student}'s amount? This cannot be undone.` : `Take ${row.student} off the list?`}
+            </span>
+            <div className="flex gap-2">
+              <Submit variant="danger">Yes</Submit>
+              <button type="button" onClick={() => setSure(false)} className="rounded-lg border border-slate-300 px-3 py-1.5 text-[13px] text-slate-600">No</button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
   );
 }
 
