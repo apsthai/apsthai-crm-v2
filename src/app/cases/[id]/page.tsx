@@ -13,6 +13,8 @@ import { addFeedback, updateApplication, addStaff, addTask, closeLost, endStaff,
 import { AddSchool } from "./add-school";
 import { ResultSelect } from "./result-select";
 import { SubAgentFields } from "./sub-agent-fields";
+import { EducationFields } from "@/components/education-fields";
+import { academicYear, educationLookups } from "@/lib/education";
 import { AddByHand } from "@/app/financial/collect-table";
 import { type ChipState, StageChip } from "./stage-chip";
 
@@ -46,7 +48,7 @@ export default async function CasePage({ params, searchParams }: {
     lead: { name_en: string } | null; sub_agent: { name: string } | null;
   };
 
-  const [links, stages, latest, apps, tasks, prog, weighted, staff, teams, products, channels, partners, stageLog, otherCases, edu, contacts] = await Promise.all([
+  const [links, stages, latest, apps, tasks, prog, weighted, staff, teams, products, channels, partners, stageLog, otherCases, edu, contacts, eduLook] = await Promise.all([
     sb.from("case_staff").select("id, staff_id, start_date, end_date, created_at").eq("case_id", id).order("start_date").order("created_at"),
     sb.from("stages").select("id, name_en, sort_order, level, milestone, editable_by_team_id").eq("category_id", kase.category_id).eq("active", true).order("sort_order"),
     sb.from("v_stage_latest").select("application_id, stage_id, status, date, approval").eq("case_id", id),
@@ -61,8 +63,9 @@ export default async function CasePage({ params, searchParams }: {
     sb.from("partners").select("id, name, default_share_pct").eq("active", true).order("name"),
     sb.from("stage_updates").select("id, application_id, stage_id, status, approval, approval_note, date, remark, created_at, created_by").eq("case_id", id).order("created_at", { ascending: false }),
     sb.from("cases").select("id, intake, overall_status, category:categories(name_en)").eq("student_id", kase.student.id).neq("id", id).order("intake"),
-    sb.from("education").select("academic_year, school:schools(name), level:levels(name_en)").eq("student_id", kase.student.id).order("academic_year", { ascending: false }).limit(1),
+    sb.from("education").select("academic_year, level_id, school:schools(name), level:levels(name_en)").eq("student_id", kase.student.id).order("academic_year", { ascending: false }).limit(1),
     sb.from("contacts").select("relation, type, value").eq("student_id", kase.student.id).eq("active", true).in("type", ["phone", "line"]).order("created_at"),
+    educationLookups(sb),
   ]);
 
   type App = { id: string; programme: string | null; commissionable_fee: number | null; currency: string; expected_income: number | null; result: string; created_at: string; created_by: string | null;
@@ -168,7 +171,7 @@ export default async function CasePage({ params, searchParams }: {
   const statusPill = kase.overall_status === "success" ? ["Successful", "bg-emerald-50 text-emerald-700"]
     : kase.overall_status === "fail" ? ["Lost", "bg-red-50 text-brand-red"]
     : kase.overall_status === "in_progress" ? ["In progress", "bg-navy-50 text-navy"] : ["Not started", "bg-slate-100 text-slate-600"];
-  const edu0 = (edu.data ?? [])[0] as unknown as { academic_year: string; school: { name: string } | null; level: { name_en: string } | null } | undefined;
+  const edu0 = (edu.data ?? [])[0] as unknown as { academic_year: string; level_id: string | null; school: { name: string } | null; level: { name_en: string } | null } | undefined;
   const contactRows = (contacts.data ?? []) as { relation: string; type: string; value: string }[];
   const phone = contactRows.find((x) => x.type === "phone");
   const line = contactRows.find((x) => x.type === "line");
@@ -538,6 +541,9 @@ export default async function CasePage({ params, searchParams }: {
                   </Field>
                   <Field label="Phone"><input name="phone" inputMode="tel" defaultValue={phone?.value ?? ""} className={inputCls} /></Field>
                   <Field label="LINE ID"><input name="line" defaultValue={line?.value ?? ""} className={inputCls} /></Field>
+                  <EducationFields schoolNames={eduLook.schoolNames} levels={eduLook.levels} listId="edit-school-names"
+                    defaultSchool={edu0?.academic_year === academicYear() ? edu0?.school?.name ?? "" : ""}
+                    defaultLevel={edu0?.academic_year === academicYear() ? edu0?.level_id ?? "" : ""} />
                   <Submit>Save</Submit>
                 </form>
               </details>

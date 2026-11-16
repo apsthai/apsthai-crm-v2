@@ -2,16 +2,18 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { getMe } from "@/lib/auth";
 import { fmtMonth, todayBangkok } from "@/lib/dates";
+import { educationLookups } from "@/lib/education";
 import { NewCaseForm, type StudentOption } from "./new-case-form";
 
 export default async function NewCasePage() {
   const { supabase: sb, me } = await getMe();
-  const [students, cats, channels, staff] = await Promise.all([
+  const [students, cats, channels, staff, edu] = await Promise.all([
     sb.from("students").select("id, codename, nickname, firstname, lastname, cases(id, intake, overall_status, category_id, category:categories(name_en))")
       .is("merged_into", null).is("anonymized_at", null).order("codename"),
     sb.from("categories").select("id, name_en").eq("active", true).order("sort_order"),
     sb.from("lead_channels").select("id, name_en").eq("active", true).order("sort_order"),
     sb.from("staff").select("id, codename").eq("handles_cases", true).eq("active", true).order("codename"),
+    educationLookups(sb),
   ]);
   if (students.error) throw new Error(students.error.message);
 
@@ -37,6 +39,8 @@ export default async function NewCasePage() {
         staff={(staff.data ?? []) as { id: string; codename: string }[]}
         me={{ id: me.id, codename: me.codename, isAdmin: me.role === "admin" }}
         thisYear={Number(todayBangkok().slice(0, 4))}
+        schoolNames={edu.schoolNames}
+        levels={edu.levels}
       />
     </AppShell>
   );

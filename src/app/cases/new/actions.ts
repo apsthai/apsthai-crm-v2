@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getMe } from "@/lib/auth";
+import { saveCurrentEducation } from "@/lib/education";
 
 export type NewCaseState = { error: string | null };
 
@@ -36,6 +37,12 @@ export async function createCase(_prev: NewCaseState, fd: FormData): Promise<New
     p_staff2: s(fd, "staff2"),
   });
   if (error) return { error: error.message };
+  // Current school and year, if given, go on the student's record for this academic year.
+  let eduErr: string | null = null;
+  if (s(fd, "current_school") || s(fd, "current_level")) {
+    const { data: kase } = await supabase.from("cases").select("student_id").eq("id", data).single();
+    if (kase) eduErr = await saveCurrentEducation(supabase, kase.student_id, s(fd, "current_school"), s(fd, "current_level"));
+  }
   revalidatePath("/", "layout");
-  redirect(`/cases/${data}?ok=1`);
+  redirect(`/cases/${data}?${eduErr ? `err=${encodeURIComponent(`Case created, but the school could not be saved: ${eduErr}`)}` : "ok=1"}`);
 }

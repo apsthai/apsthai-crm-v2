@@ -3,7 +3,9 @@
 import Link from "next/link";
 import { useActionState, useState } from "react";
 import { MonthPick } from "@/components/date-pick";
+import { EducationFields } from "@/components/education-fields";
 import { Field, inputCls } from "@/components/fields";
+import type { LevelOpt } from "@/lib/education";
 import { Submit } from "@/components/submit";
 import { createCase, type NewCaseState } from "./actions";
 
@@ -40,9 +42,9 @@ function StudentLine({ s }: { s: StudentOption }) {
   );
 }
 
-export function NewCaseForm({ students, services, channels, staff, me, thisYear }: {
+export function NewCaseForm({ students, services, channels, staff, me, thisYear, schoolNames, levels }: {
   students: StudentOption[]; services: Opt[]; channels: Opt[]; staff: { id: string; codename: string }[];
-  me: { id: string; codename: string; isAdmin: boolean }; thisYear: number;
+  me: { id: string; codename: string; isAdmin: boolean }; thisYear: number; schoolNames: string[]; levels: LevelOpt[];
 }) {
   const [state, action] = useActionState<NewCaseState, FormData>(createCase, { error: null });
   const [mode, setMode] = useState<"pick" | "new">("pick");
@@ -145,6 +147,13 @@ export function NewCaseForm({ students, services, channels, staff, me, thisYear 
             <button type="button" onClick={() => { setMode("pick"); setAllowDup(false); }} className="justify-self-start text-sm text-navy hover:underline">
               ← Search existing students instead
             </button>
+          </div>
+        )}
+
+        {(mode === "new" || picked) && (
+          <div className="mt-3 grid gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2">
+            <EducationFields schoolNames={schoolNames} levels={levels} />
+            {mode === "pick" && <p className="text-xs text-slate-500 sm:col-span-2">Leave blank to keep what we already have for this student.</p>}
           </div>
         )}
       </Box>

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getMe } from "@/lib/auth";
+import { saveCurrentEducation } from "@/lib/education";
 import { todayBangkok } from "@/lib/dates";
 
 const s = (fd: FormData, k: string) => {
@@ -172,6 +173,8 @@ export async function updateStudent(fd: FormData) {
       : null;
     if (res?.error) return back(caseId, res.error);
   }
+  const eduErr = await saveCurrentEducation(supabase, studentId, s(fd, "current_school"), s(fd, "current_level"));
+  if (eduErr) return back(caseId, eduErr);
   back(caseId);
 }
 
