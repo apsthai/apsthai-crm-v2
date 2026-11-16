@@ -34,7 +34,7 @@ export type RvRaw = {
 export type Rv = {
   id: string; type: string; amount: number; currency: string; status: string; createdAt: string; caseId: string;
   student: string; fullName: string; school: string; schoolId: string | null; programme: string; service: string;
-  how: string; staff: string[]; followUpOn: string | null; followUpNote: string | null; categoryId: string; intake: string | null; partner: string | null; partnerPct: number; defaultText: string;
+  how: string; byHand: boolean; staff: string[]; followUpOn: string | null; followUpNote: string | null; categoryId: string; intake: string | null; partner: string | null; partnerPct: number; defaultText: string;
 };
 
 // Flattens a receivable row for display and builds the default text for an invoice line.
@@ -56,7 +56,7 @@ export function flatRv(r: RvRaw): Rv {
   return {
     id: r.id, type: r.type, amount: Number(r.amount), currency: r.currency, status: r.status, createdAt: r.created_at,
     caseId: r.case_id, student: st?.codename ?? "", fullName, school, schoolId: product?.school_id ?? null, programme,
-    service: one(k?.category ?? null)?.name_en ?? "", how,
+    service: one(k?.category ?? null)?.name_en ?? "", how, byHand: !term,
     staff: (k?.case_staff ?? []).filter((c) => !c.end_date).sort((a, b) => a.created_at.localeCompare(b.created_at))
       .map((c) => one(c.staff)?.codename ?? "").filter(Boolean),
     followUpOn: r.follow_up_on, followUpNote: r.follow_up_note,

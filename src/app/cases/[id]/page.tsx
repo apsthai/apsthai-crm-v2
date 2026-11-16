@@ -7,12 +7,13 @@ import { Submit } from "@/components/submit";
 import { DatePick, MonthPick } from "@/components/date-pick";
 import { UndoButton } from "@/components/undo-success";
 import { getMe } from "@/lib/auth";
-import { daysBetween, fmtDate, fmtMonth, todayBangkok } from "@/lib/dates";
+import { addDays, daysBetween, fmtDate, fmtMonth, todayBangkok } from "@/lib/dates";
 import { fmtTHB } from "@/lib/money";
 import { addFeedback, updateApplication, addStaff, addTask, closeLost, endStaff, reopenCase, setResult, toggleTask, updateCase, updateStudent, deleteCase, updateTask, deleteTask } from "./actions";
 import { AddSchool } from "./add-school";
 import { ResultSelect } from "./result-select";
 import { SubAgentFields } from "./sub-agent-fields";
+import { AddByHand } from "@/app/financial/collect-table";
 import { type ChipState, StageChip } from "./stage-chip";
 
 const CURRENCIES = ["GBP", "THB", "USD", "EUR", "AUD", "NZD", "CAD", "SGD", "CHF"];
@@ -503,9 +504,14 @@ export default async function CasePage({ params, searchParams }: {
                 ((recv ?? []) as unknown as { id: string; type: string; payer_name: string | null; amount: number; currency: string; expected_date: string; status: string; school: { name: string } | null; partner: { name: string } | null; payment_lines: { amount: number }[] }[]).map((r) => (
                   <div key={r.id} className="flex justify-between gap-3 border-b border-slate-100 py-2 text-sm last:border-0">
                     <span>{r.school?.name ?? r.partner?.name ?? r.payer_name} <span className="block text-[13px] text-slate-500">{r.type.replace("_", " ")} · due {fmtDate(r.expected_date)}</span></span>
-                    <span className="text-right">{money(Number(r.amount), r.currency)} <span className="block text-[13px] text-slate-500">{r.status.replace("_", " ")}</span></span>
+                    <span className="text-right">{Number(r.amount) ? money(Number(r.amount), r.currency) : `${r.currency} · amount to confirm`} <span className="block text-[13px] text-slate-500">{r.status.replace("_", " ")}</span></span>
                   </div>
                 ))
+              )}
+              {isAdmin && (
+                <div className="flex justify-end pt-3">
+                  <AddByHand fixedCase={kase.id} backTo={`/cases/${kase.id}`} inAWeek={addDays(todayBangkok(), 7)} label="+ Add an amount" up={false} />
+                </div>
               )}
             </Card>
           )}

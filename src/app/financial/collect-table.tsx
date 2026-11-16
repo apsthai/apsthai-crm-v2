@@ -8,7 +8,7 @@ import { Submit } from "@/components/submit";
 import { fmtDate } from "@/lib/dates";
 import { money, n2 } from "@/lib/fin";
 import type { Rv } from "@/lib/fin-data";
-import { addReceivable, dropReceivable, setFollowUp } from "./actions";
+import { addReceivable, deleteReceivable, dropReceivable, setFollowUp, updateReceivable } from "./actions";
 
 type Row = Rv & { approved: string };
 const sel = "rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm outline-none focus:border-navy";
@@ -61,7 +61,7 @@ export function CollectTable({ rows, addByHand, today, inAWeek }:
               <th className="border-b border-slate-200 px-4 py-2.5 text-right font-semibold">Amount</th>
               <th className="border-b border-slate-200 px-4 py-2.5 font-semibold">Staff</th>
               <th className="border-b border-slate-200 px-4 py-2.5 font-semibold">Follow up</th>
-              <th className="border-b border-slate-200 px-4 py-2.5"><span className="sr-only">Not collecting</span></th>
+              <th className="border-b border-slate-200 px-4 py-2.5"><span className="sr-only">Edit</span></th>
             </tr>
           </thead>
           <tbody>
@@ -89,16 +89,7 @@ export function CollectTable({ rows, addByHand, today, inAWeek }:
                   </td>
                   <td className="border-b border-slate-100 px-4 py-2.5 text-slate-600">{r.staff.join(", ")}</td>
                   <td className="border-b border-slate-100 px-4 py-2.5"><FollowUp row={r} due={due(r)} inAWeek={inAWeek} /></td>
-                  <td className="border-b border-slate-100 px-4 py-2.5 text-right">
-                    <details className="relative inline-block">
-                      <summary className="cursor-pointer list-none text-xs text-slate-500 hover:text-brand-red">Not collecting</summary>
-                      <form action={dropReceivable} className="absolute right-0 z-10 mt-1 w-60 rounded-lg border border-slate-200 bg-white p-3 text-left shadow-lg">
-                        <input type="hidden" name="id" value={r.id} />
-                        <p className="mb-2 text-[13px] text-slate-600">Take {r.student} off this list? Use this when we will not bill this amount.</p>
-                        <Submit variant="danger" className="w-full">Yes, not collecting</Submit>
-                      </form>
-                    </details>
-                  </td>
+                  <td className="border-b border-slate-100 px-4 py-2.5 text-right"><EditAmount row={r} /></td>
                 </tr>
               );
             })}
@@ -122,6 +113,53 @@ export function CollectTable({ rows, addByHand, today, inAWeek }:
         </div>
       </div>
     </section>
+  );
+}
+
+const CURRENCIES = ["GBP", "THB", "SGD", "USD", "AUD", "EUR", "NZD", "CAD", "CHF"];
+
+function EditAmount({ row }: { row: Row }) {
+  return (
+    <details className="relative inline-block">
+      <summary className="cursor-pointer list-none text-xs text-navy hover:underline">Edit</summary>
+      <div className="absolute right-0 z-10 mt-1 flex w-72 flex-col gap-3 rounded-lg border border-slate-200 bg-white p-3 text-left shadow-lg">
+        <form action={updateReceivable} className="flex flex-col gap-2.5">
+          <input type="hidden" name="id" value={row.id} />
+          <Field label="What it is">
+            <select name="type" defaultValue={row.type} className={inputCls}>
+              <option value="commission">Commission from a school</option>
+              <option value="service_fee">Service fee</option>
+            </select>
+          </Field>
+          <div className="grid grid-cols-[96px_1fr] gap-2">
+            <Field label="Currency">
+              <select name="currency" defaultValue={row.currency} className={inputCls}>
+                {[...new Set([row.currency, ...CURRENCIES])].map((c) => <option key={c}>{c}</option>)}
+              </select>
+            </Field>
+            <Field label="Amount (blank = to confirm)">
+              <input name="amount" defaultValue={row.amount ? n2(row.amount) : ""} inputMode="decimal" className={`${inputCls} text-right`} />
+            </Field>
+          </div>
+          <Submit>Save</Submit>
+        </form>
+        <div className="border-t border-slate-200 pt-2.5">
+          {row.byHand ? (
+            <form action={deleteReceivable}>
+              <input type="hidden" name="id" value={row.id} />
+              <p className="mb-2 text-[13px] text-slate-600">Added by hand by mistake? Delete it.</p>
+              <Submit variant="danger" className="w-full">Delete this amount</Submit>
+            </form>
+          ) : (
+            <form action={dropReceivable}>
+              <input type="hidden" name="id" value={row.id} />
+              <p className="mb-2 text-[13px] text-slate-600">We will not bill this amount? Take it off the list.</p>
+              <Submit variant="danger" className="w-full">Not collecting</Submit>
+            </form>
+          )}
+        </div>
+      </div>
+    </details>
   );
 }
 
@@ -152,22 +190,54 @@ function FollowUp({ row, due, inAWeek }: { row: Row; due: boolean; inAWeek: stri
   );
 }
 
-const CURS = ["GBP", "THB", "SGD", "USD", "AUD", "EUR", "NZD", "CAD", "CHF"];
+export type CaseOption = { id: string; student: string; search: string; service: string; intake: string; schools: string; staff: string; done: boolean };
 
-export function AddByHand({ cases, inAWeek }: { cases: { id: string; label: string }[]; inAWeek: string }) {
+// Type part of a nickname or name; the list shows the matching cases, successful ones first.
+function CasePicker({ cases }: { cases: CaseOption[] }) {
+  const [q, setQ] = useState("");
+  const [picked, setPicked] = useState<CaseOption | null>(null);
+  const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const hits = words.length ? cases.filter((c) => words.every((w) => c.search.includes(w)))
+    .sort((a, b) => Number(b.done) - Number(a.done)).slice(0, 8) : [];
+  if (picked) {
+    return (
+      <div className="flex items-start justify-between gap-2 rounded-lg border border-navy/30 bg-navy-50/50 px-3 py-2 text-sm">
+        <input type="hidden" name="case_id" value={picked.id} />
+        <span><b>{picked.student}</b><span className="block text-xs text-slate-600">{picked.service} · {picked.intake}{picked.schools ? ` · ${picked.schools}` : ""}</span></span>
+        <button type="button" onClick={() => setPicked(null)} className="text-xs text-navy hover:underline">Change</button>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-col gap-1">
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Type a nickname or name" aria-label="Find the case" className={inputCls} />
+      {words.length > 0 && (
+        <div className="max-h-56 overflow-y-auto rounded-lg border border-slate-200">
+          {hits.length === 0 && <p className="px-3 py-2 text-xs text-slate-500">No case found.</p>}
+          {hits.map((c) => (
+            <button key={c.id} type="button" onClick={() => setPicked(c)}
+              className="block w-full border-b border-slate-100 px-3 py-2 text-left text-sm last:border-0 hover:bg-slate-50">
+              <b>{c.student}</b>{c.done && <span className="ml-1.5 rounded-full bg-emerald-50 px-1.5 text-[11px] font-semibold text-emerald-700">Successful</span>}
+              <span className="block text-xs text-slate-500">{c.service} · {c.intake}{c.schools ? ` · ${c.schools}` : ""}{c.staff ? ` · ${c.staff}` : ""}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function AddByHand({ cases, fixedCase, inAWeek, backTo, label = "+ Add an amount by hand", up = true }:
+  { cases?: CaseOption[]; fixedCase?: string; inAWeek: string; backTo?: string; label?: string; up?: boolean }) {
   return (
     <details className="relative">
       <summary className="cursor-pointer list-none rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-navy hover:border-navy">
-        + Add an amount by hand
+        {label}
       </summary>
       <form action={addReceivable}
-        className="absolute right-0 bottom-full z-10 mb-2 flex w-[min(360px,90vw)] flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-lg">
-        <Field label="Case">
-          <select name="case_id" required className={inputCls} defaultValue="">
-            <option value="" disabled>Choose a case</option>
-            {cases.map((c) => <option key={c.id} value={c.id}>{c.label}</option>)}
-          </select>
-        </Field>
+        className={`absolute right-0 z-10 flex w-[min(360px,90vw)] flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-lg ${up ? "bottom-full mb-2" : "top-full mt-2"}`}>
+        {backTo && <input type="hidden" name="back_to" value={backTo} />}
+        {fixedCase ? <input type="hidden" name="case_id" value={fixedCase} /> : <Field label="Case"><CasePicker cases={cases ?? []} /></Field>}
         <Field label="What it is">
           <select name="type" className={inputCls} defaultValue="commission">
             <option value="commission">Commission from a school</option>
@@ -176,7 +246,7 @@ export function AddByHand({ cases, inAWeek }: { cases: { id: string; label: stri
         </Field>
         <div className="grid grid-cols-[110px_1fr] gap-2">
           <Field label="Currency">
-            <select name="currency" className={inputCls} defaultValue="GBP">{CURS.map((c) => <option key={c}>{c}</option>)}</select>
+            <select name="currency" className={inputCls} defaultValue="GBP">{CURRENCIES.map((c) => <option key={c}>{c}</option>)}</select>
           </Field>
           <Field label="Amount (blank if not known yet)">
             <input name="amount" inputMode="decimal" className={`${inputCls} text-right`} placeholder="0.00" />

@@ -6,7 +6,7 @@ import { addDays, addMonths, daysBetween, fmtDate, fmtMonth, monthStart, todayBa
 import { flatRv, latestRates, RV_SELECT, type RvRaw } from "@/lib/fin-data";
 import { fmtTHB, toTHB } from "@/lib/money";
 import { FinHeader } from "./tabs";
-import { AddByHand, CollectTable } from "./collect-table";
+import { AddByHand, type CaseOption, CollectTable } from "./collect-table";
 
 export default async function CollectPage({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string }> }) {
   const { supabase: sb, me } = await getMe();
@@ -20,7 +20,9 @@ export default async function CollectPage({ searchParams }: { searchParams: Prom
     sb.from("invoice_lines").select("receivable_id, invoice:invoices!inner(status)").eq("invoice.status", "draft"),
     sb.from("invoices").select("id, date, currency, total, invoice_lines(receivable_id)").in("status", ["issued", "partially_paid"]),
     sb.from("payments").select("received_thb").gte("received_date", m0).lt("received_date", addMonths(m0, 1)),
-    sb.from("cases").select("id, intake, student:students(codename), category:categories(name_en)").order("created_at", { ascending: false }),
+    sb.from("cases").select(`id, intake, overall_status, student:students(codename, nickname, firstname, lastname), category:categories(name_en),
+      applications(product:products(school:schools(name))), case_staff(end_date, staff:staff!case_staff_staff_id_fkey(codename))`)
+      .order("created_at", { ascending: false }),
     latestRates(sb),
   ]);
   if (rvRes.error) throw new Error(rvRes.error.message);
@@ -46,10 +48,20 @@ export default async function CollectPage({ searchParams }: { searchParams: Prom
   for (const r of rows) { const t = toTHB(r.amount, r.currency, rates); notBilled += t.thb; missing ||= t.missing; }
   const moneyIn = (payRes.data ?? []).reduce((s, p) => s + Number(p.received_thb), 0);
 
-  type C = { id: string; intake: string | null; student: { codename: string } | null; category: { name_en: string } | null };
-  const cases = ((casesRes.data ?? []) as unknown as C[])
-    .map((c) => ({ id: c.id, label: `${c.student?.codename ?? "?"} · ${c.category?.name_en ?? ""}${c.intake ? ` · ${fmtMonth(c.intake)}` : ""}` }))
-    .sort((a, b) => a.label.localeCompare(b.label));
+  type C = { id: string; intake: string | null; overall_status: string;
+    student: { codename: string; nickname: string; firstname: string | null; lastname: string | null } | null;
+    category: { name_en: string } | null; applications: { product: { school: { name: string } | null } | null }[];
+    case_staff: { end_date: string | null; staff: { codename: string } | null }[] };
+  const cases: CaseOption[] = ((casesRes.data ?? []) as unknown as C[]).map((c) => {
+    const schools = [...new Set(c.applications.map((a) => a.product?.school?.name).filter(Boolean))].join(", ");
+    const st = c.student;
+    return {
+      id: c.id, student: st?.codename ?? "?", service: c.category?.name_en ?? "", intake: c.intake ? fmtMonth(c.intake) : "",
+      schools, staff: c.case_staff.filter((x) => !x.end_date).map((x) => x.staff?.codename).filter(Boolean).join(", "),
+      done: c.overall_status === "success",
+      search: [st?.codename, st?.nickname, st?.firstname, st?.lastname, schools].filter(Boolean).join(" ").toLowerCase(),
+    };
+  });
 
   const tiles = [
     ["Not billed yet", fmtTHB(notBilled), `${rows.length} ${rows.length === 1 ? "amount" : "amounts"}${followDue ? ` · ${followDue} to follow up` : ""} · incl. VAT, at today's rates`],
