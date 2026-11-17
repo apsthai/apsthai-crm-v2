@@ -7,7 +7,7 @@ import { COUNTRIES, n2 } from "@/lib/fin";
 import { DeleteButton } from "@/components/delete-button";
 import { addSchoolService, deleteSchool, deleteSchoolService, saveSchool } from "./actions";
 
-type Term = { id: string; seq: number; type: string; payer_type: string; rate_pct: number | null; amount: number | null; currency: string | null; repeat: string; trigger_stage_id: string | null };
+type Term = { id: string; seq: number; type: string; payer_type: string; rate_pct: number | null; amount: number | null; currency: string | null; repeat: string; trigger_stage_id: string | null; bill_month: number | null };
 type Product = { id: string; active: boolean; category: { id: string; name_en: string } | null; terms: Term[]; canDelete?: boolean };
 export type SchoolRow = { id: string; name: string; country: string; type: string; default_currency: string | null; notes: string | null; active: boolean; products: Product[]; canDelete?: boolean };
 type Stage = { id: string; category_id: string; name_en: string };
@@ -16,8 +16,16 @@ const TYPES = [["boarding_school", "Boarding school"], ["university", "Universit
   ["thai_school", "School in Thailand"], ["in_house", "APSthai (in-house)"], ["other", "Other"]];
 const CURS = ["GBP", "THB", "SGD", "USD", "AUD", "EUR", "NZD", "CAD", "CHF"];
 const byStaff = (s: SchoolRow) => !!s.notes?.startsWith("Added by");
-const termText = (t: Term | undefined, cur: string | null) =>
-  !t ? "No rate yet" : t.rate_pct != null ? `${Number(t.rate_pct)}% of the fee` : `${t.currency ?? cur ?? ""} ${n2(Number(t.amount))} fixed`;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const val = (t: Term) => Number(t.rate_pct ?? t.amount ?? 0);
+// One line per service: the whole rate (all instalments added up) and how many instalments.
+const termText = (terms: Term[], cur: string | null) => {
+  const t = terms[0];
+  if (!t) return "No rate yet";
+  const sum = Math.round(terms.reduce((s, x) => s + val(x), 0) * 100) / 100;
+  const what = t.rate_pct != null ? `${sum}% of the fee` : `${t.currency ?? cur ?? ""} ${n2(sum)} fixed`;
+  return terms.length > 1 ? `${what} in ${terms.length} instalments` : what;
+};
 
 export function SchoolsTable({ schools, categories, stages, open }:
   { schools: SchoolRow[]; categories: { id: string; name_en: string }[]; stages: Stage[]; open: string | null }) {
@@ -73,7 +81,7 @@ export function SchoolsTable({ schools, categories, stages, open }:
                   <td className="border-b border-slate-100 px-4 py-2.5">{s.country}</td>
                   <td className="border-b border-slate-100 px-4 py-2.5">
                     {products.length === 0 ? <span className="text-slate-400">No service</span> : products.map((p) => (
-                      <div key={p.id}>{p.category!.name_en} · <b className="font-medium">{termText(p.terms[0], s.default_currency)}</b>
+                      <div key={p.id}>{p.category!.name_en} · <b className="font-medium">{termText(p.terms, s.default_currency)}</b>
                         <span className="text-slate-500"> · {stageName(p.terms[0]?.trigger_stage_id ?? null)}</span></div>
                     ))}
                   </td>
@@ -86,7 +94,7 @@ export function SchoolsTable({ schools, categories, stages, open }:
                 isOpen && (
                   <tr key={`${s.id}-edit`} className="bg-slate-50">
                     <td colSpan={5} className="border-b border-slate-200 px-4 pt-1 pb-4">
-                      <EditSchool key={JSON.stringify([s.name, s.country, s.type, s.default_currency, products.map((p) => p.terms[0] ?? p.id)])} school={s} products={products} categories={categories} stages={stages} onClose={() => setEditing(null)} />
+                      <EditSchool key={JSON.stringify([s.name, s.country, s.type, s.default_currency, products.map((p) => [p.id, ...p.terms])])} school={s} products={products} categories={categories} stages={stages} onClose={() => setEditing(null)} />
                     </td>
                   </tr>
                 ),
@@ -121,50 +129,21 @@ function EditSchool({ school, products, categories, stages, onClose }:
         </div>
         {products.length > 0 && (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] border-collapse text-sm">
+            <table className="w-full min-w-[820px] border-collapse text-sm">
               <thead>
                 <tr className="text-left text-xs tracking-wide text-slate-500 uppercase">
-                  {["Service", "What it is", "Who pays", "How", "Rate or amount", "Counted at stage", "Repeats", ""].map((h, i) => (
+                  {["Service", "What it is", "Who pays", "How", "Instalments", "Counted at stage", "Repeats", ""].map((h, i) => (
                     <th key={i} className="border-b border-slate-200 px-2 py-2 font-semibold">{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {products.map((p) => {
-                  const t = p.terms[0];
-                  const sel = "rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm";
-                  return (
-                    <tr key={p.id}>
-                      <td className="border-b border-slate-100 px-2 py-2 font-medium">{p.category!.name_en}</td>
-                      <td className="border-b border-slate-100 px-2 py-2">
-                        <select name={`type_${p.id}`} defaultValue={t?.type ?? "commission"} className={sel}><option value="commission">Commission</option><option value="service_fee">Service fee</option></select>
-                      </td>
-                      <td className="border-b border-slate-100 px-2 py-2">
-                        <select name={`payer_${p.id}`} defaultValue={t?.payer_type ?? "school"} className={sel}><option value="school">The school</option><option value="individual">The family</option></select>
-                      </td>
-                      <td className="border-b border-slate-100 px-2 py-2">
-                        <select name={`how_${p.id}`} defaultValue={t?.amount != null ? "fixed" : "percent"} className={sel}><option value="percent">% of the fee</option><option value="fixed">Fixed amount</option></select>
-                      </td>
-                      <td className="border-b border-slate-100 px-2 py-2">
-                        <input name={`value_${p.id}`} defaultValue={t ? Number(t.rate_pct ?? t.amount) : 10} inputMode="decimal" className={`${sel} w-24 text-right`} />
-                      </td>
-                      <td className="border-b border-slate-100 px-2 py-2">
-                        <select name={`stage_${p.id}`} defaultValue={t?.trigger_stage_id ?? ""} className={sel}>
-                          <option value="">Choose</option>
-                          {stages.filter((x) => x.category_id === p.category!.id).map((x) => <option key={x.id} value={x.id}>{x.name_en}</option>)}
-                        </select>
-                      </td>
-                      <td className="border-b border-slate-100 px-2 py-2">
-                        <select name={`repeat_${p.id}`} defaultValue={t?.repeat ?? "once"} className={sel}><option value="once">Once</option><option value="yearly">Every year</option><option value="termly">Every term</option></select>
-                      </td>
-                      <td className="border-b border-slate-100 px-2 py-2 text-right">
-                        {p.canDelete && <DeleteButton inForm small action={deleteSchoolService.bind(null, p.id)} question={`Remove ${p.category!.name_en}?`} label="Remove" />}
-                      </td>
-                    </tr>
-                  );
-                })}
+                {products.map((p) => <ProductRows key={p.id} p={p} stages={stages.filter((x) => x.category_id === p.category!.id)} />)}
               </tbody>
             </table>
+            <p className="mt-1.5 text-xs text-slate-500">
+              Each instalment becomes its own amount to collect when a case is approved, reminded in its bill month (blank = no reminder).
+            </p>
           </div>
         )}
         <div className="flex gap-2">
@@ -193,5 +172,74 @@ function EditSchool({ school, products, categories, stages, onClose }:
         </div>
       )}
     </div>
+  );
+}
+
+// One service of a school: the shared settings, then one line per instalment (rate or amount, and the bill month).
+function ProductRows({ p, stages }: { p: Product; stages: Stage[] }) {
+  const terms = [...p.terms].sort((a, b) => a.seq - b.seq);
+  const t = terms[0];
+  const [vals, setVals] = useState<string[]>(terms.length ? terms.map((x) => String(val(x))) : ["10"]);
+  const [months, setMonths] = useState<string[]>(terms.length ? terms.map((x) => (x.bill_month ? String(x.bill_month) : "")) : [""]);
+  // Changing the number splits the total equally; each part can still be changed by hand.
+  const setCount = (n: number) => {
+    const total = vals.reduce((s, v) => s + (Number(v) || 0), 0);
+    const each = Math.floor((total / n) * 100) / 100;
+    setVals(Array.from({ length: n }, (_, i) => String(i === n - 1 ? Math.round((total - each * (n - 1)) * 100) / 100 : each)));
+    setMonths(Array.from({ length: n }, (_, i) => months[i] ?? ""));
+  };
+  const sel = "rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm";
+  const n = vals.length;
+  return (
+    <>
+      <tr>
+        <td className="px-2 pt-2 font-medium">{p.category!.name_en}</td>
+        <td className="px-2 pt-2">
+          <select name={`type_${p.id}`} defaultValue={t?.type ?? "commission"} className={sel}><option value="commission">Commission</option><option value="service_fee">Service fee</option></select>
+        </td>
+        <td className="px-2 pt-2">
+          <select name={`payer_${p.id}`} defaultValue={t?.payer_type ?? "school"} className={sel}><option value="school">The school</option><option value="individual">The family</option></select>
+        </td>
+        <td className="px-2 pt-2">
+          <select name={`how_${p.id}`} defaultValue={t?.amount != null ? "fixed" : "percent"} className={sel}><option value="percent">% of the fee</option><option value="fixed">Fixed amount</option></select>
+        </td>
+        <td className="px-2 pt-2">
+          <select name={`count_${p.id}`} value={n} onChange={(e) => setCount(Number(e.target.value))} aria-label={`Instalments for ${p.category!.name_en}`} className={sel}>
+            {[1, 2, 3].map((k) => <option key={k} value={k}>{k}</option>)}
+          </select>
+        </td>
+        <td className="px-2 pt-2">
+          <select name={`stage_${p.id}`} defaultValue={t?.trigger_stage_id ?? ""} className={sel}>
+            <option value="">Choose</option>
+            {stages.map((x) => <option key={x.id} value={x.id}>{x.name_en}</option>)}
+          </select>
+        </td>
+        <td className="px-2 pt-2">
+          <select name={`repeat_${p.id}`} defaultValue={t?.repeat ?? "once"} className={sel}><option value="once">Once</option><option value="yearly">Every year</option><option value="termly">Every term</option></select>
+        </td>
+        <td className="px-2 pt-2 text-right">
+          {p.canDelete && <DeleteButton inForm small action={deleteSchoolService.bind(null, p.id)} question={`Remove ${p.category!.name_en}?`} label="Remove" />}
+        </td>
+      </tr>
+      <tr>
+        <td className="border-b border-slate-100 px-2 pb-2" />
+        <td colSpan={7} className="border-b border-slate-100 px-2 pt-1.5 pb-2.5">
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
+            {vals.map((v, i) => (
+              <span key={i} className="inline-flex items-center gap-1.5 text-[13px] text-slate-600">
+                {n > 1 ? `Instalment ${i + 1}` : "Rate or amount"}
+                <input name={`value_${p.id}_${i + 1}`} value={v} onChange={(e) => setVals(vals.map((x, j) => (j === i ? e.target.value : x)))}
+                  inputMode="decimal" aria-label={`Rate or amount, instalment ${i + 1}`} className={`${sel} w-24 text-right`} />
+                <select name={`month_${p.id}_${i + 1}`} value={months[i] ?? ""} onChange={(e) => setMonths(months.map((x, j) => (j === i ? e.target.value : x)))}
+                  aria-label={`Bill month, instalment ${i + 1}`} className={sel}>
+                  <option value="">Bill month</option>
+                  {MONTHS.map((m, j) => <option key={m} value={j + 1}>{m}</option>)}
+                </select>
+              </span>
+            ))}
+          </div>
+        </td>
+      </tr>
+    </>
   );
 }

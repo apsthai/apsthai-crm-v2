@@ -3,14 +3,11 @@
 import { todayBangkok } from "@/lib/dates";
 import { adminDb, back, inUse, num, s } from "../shared";
 
-// The term fields for one service of a school, named <field>_<productId>.
-function termFrom(fd: FormData, pid: string) {
-  const how = s(fd, `how_${pid}`);
-  const value = num(fd, `value_${pid}`);
+// The settings every instalment of one service shares, named <field>_<productId>.
+function shared(fd: FormData, pid: string) {
   return {
     type: s(fd, `type_${pid}`) ?? "commission", payer_type: s(fd, `payer_${pid}`) ?? "school",
     trigger_stage_id: s(fd, `stage_${pid}`), repeat: s(fd, `repeat_${pid}`) ?? "once",
-    rate_pct: how === "percent" ? value : null, amount: how === "fixed" ? value : null,
   };
 }
 
@@ -28,14 +25,26 @@ export async function saveSchool(fd: FormData) {
 
   const productIds = String(fd.get("products") ?? "").split(",").filter(Boolean);
   for (const pid of productIds) {
-    const t = termFrom(fd, pid);
-    if (!(Number(t.rate_pct ?? t.amount) >= 0) || (t.rate_pct == null && t.amount == null)) return back2("Every service needs a rate or an amount");
-    if (!t.trigger_stage_id) return back2("Choose the stage each service is counted at");
-    const { data: ex } = await sb.from("income_terms").select("id").eq("product_id", pid).order("seq").limit(1);
-    const res = ex?.length
-      ? await sb.from("income_terms").update({ ...t, currency }).eq("id", ex[0].id)
-      : await sb.from("income_terms").insert({ ...t, currency, product_id: pid, seq: 1 });
-    if (res.error) return back2(res.error);
+    const base = shared(fd, pid);
+    if (!base.trigger_stage_id) return back2("Choose the stage each service is counted at");
+    const fixed = s(fd, `how_${pid}`) === "fixed";
+    const n = Math.min(3, Math.max(1, Number(s(fd, `count_${pid}`) ?? 1)));
+    // One row per instalment (seq 1..n), each with its own rate or amount and bill month.
+    for (let k = 1; k <= n; k++) {
+      const value = num(fd, `value_${pid}_${k}`);
+      if (value == null || !(value >= 0)) return back2("Every instalment needs a rate or an amount");
+      const month = num(fd, `month_${pid}_${k}`);
+      const row = { ...base, currency, rate_pct: fixed ? null : value, amount: fixed ? value : null, bill_month: month };
+      const { data: ex } = await sb.from("income_terms").select("id").eq("product_id", pid).eq("seq", k).maybeSingle();
+      const res = ex
+        ? await sb.from("income_terms").update(row).eq("id", ex.id)
+        : await sb.from("income_terms").insert({ ...row, product_id: pid, seq: k });
+      if (res.error) return back2(res.error);
+    }
+    // Fewer instalments than before: drop the extra ones, unless a case already has an amount from them.
+    const del = await sb.from("income_terms").delete().eq("product_id", pid).gt("seq", n);
+    if (del.error) return back2(del.error.message.includes("foreign key")
+      ? "A case already has an amount from that instalment, so the number of instalments cannot go down" : del.error);
   }
   back2();
 }

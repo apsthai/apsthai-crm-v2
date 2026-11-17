@@ -11,7 +11,7 @@ export default async function SchoolsPage({ searchParams }: { searchParams: Prom
   const sp = await searchParams;
   const [schoolsRes, catsRes, stagesRes, appsRes, eduRes, payersRes] = await Promise.all([
     sb.from("schools").select(`id, name, country, type, default_currency, notes, active,
-      products(id, active, category:categories(id, name_en), terms:income_terms(id, seq, type, payer_type, rate_pct, amount, currency, repeat, trigger_stage_id))`)
+      products(id, active, category:categories(id, name_en), terms:income_terms(id, seq, type, payer_type, rate_pct, amount, currency, repeat, trigger_stage_id, bill_month))`)
       .order("name"),
     sb.from("categories").select("id, name_en").eq("active", true).order("sort_order"),
     sb.from("stages").select("id, category_id, name_en, sort_order").eq("active", true).order("sort_order"),
