@@ -84,10 +84,11 @@ export async function moveService(fd: FormData) {
   go(null, e);
 }
 
-// Sent by the arrow buttons inside the service form: move = "<stage id>:up" or ":down".
-export async function moveStage(fd: FormData) {
+// Bound to each arrow button inside the service form: "<stage id>:up" or ":down".
+// (A button's own name/value is not sent with formAction, so the stage comes in bound.)
+export async function moveStage(which: string, fd: FormData) {
   const cat = s(fd, "id")!;
-  const [sid, dir] = String(fd.get("move") ?? "").split(":");
+  const [sid, dir] = which.split(":");
   const e = await move("stages", sid, dir, { col: "category_id", val: cat });
   go(cat, e);
 }

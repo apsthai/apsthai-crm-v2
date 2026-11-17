@@ -116,8 +116,8 @@ function EditService({ row, teams, onClose }: { row: ServiceRow; teams: { id: st
               <tr key={x.id} className={x.active ? "" : "text-slate-400"}>
                 <td className="border-b border-slate-100 px-2 py-2">
                   <span className="flex gap-1">
-                    <button formAction={moveStage} name="move" value={`${x.id}:up`} disabled={i === 0} aria-label={`Move ${x.name_en} up`} className={arrow}>▲</button>
-                    <button formAction={moveStage} name="move" value={`${x.id}:down`} disabled={i === row.stages.length - 1} aria-label={`Move ${x.name_en} down`} className={arrow}>▼</button>
+                    <button formAction={moveStage.bind(null, `${x.id}:up`)} disabled={i === 0} aria-label={`Move ${x.name_en} up`} className={arrow}>▲</button>
+                    <button formAction={moveStage.bind(null, `${x.id}:down`)} disabled={i === row.stages.length - 1} aria-label={`Move ${x.name_en} down`} className={arrow}>▼</button>
                   </span>
                 </td>
                 <td className="border-b border-slate-100 px-2 py-2"><input name={`name_${x.id}`} defaultValue={x.name_en} className={`${sel} w-44`} /></td>
