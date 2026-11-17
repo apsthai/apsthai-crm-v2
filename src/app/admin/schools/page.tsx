@@ -1,0 +1,29 @@
+import { redirect } from "next/navigation";
+import { AppShell } from "@/components/app-shell";
+import { Flash } from "@/components/flash";
+import { getMe } from "@/lib/auth";
+import { AdminHeader } from "../tabs";
+import { SchoolsTable, type SchoolRow } from "./schools-table";
+
+export default async function SchoolsPage({ searchParams }: { searchParams: Promise<{ open?: string; ok?: string; err?: string }> }) {
+  const { supabase: sb, me } = await getMe();
+  if (me.role !== "admin") redirect("/dashboard");
+  const sp = await searchParams;
+  const [schoolsRes, catsRes, stagesRes] = await Promise.all([
+    sb.from("schools").select(`id, name, country, type, default_currency, notes, active,
+      products(id, active, category:categories(id, name_en), terms:income_terms(id, seq, type, payer_type, rate_pct, amount, currency, repeat, trigger_stage_id))`)
+      .order("name"),
+    sb.from("categories").select("id, name_en").eq("active", true).order("sort_order"),
+    sb.from("stages").select("id, category_id, name_en, sort_order").eq("active", true).order("sort_order"),
+  ]);
+  if (schoolsRes.error) throw new Error(schoolsRes.error.message);
+  return (
+    <AppShell active="/admin/schools">
+      <AdminHeader active="/admin/schools" />
+      <Flash ok={sp.ok} err={sp.err} />
+      <SchoolsTable schools={(schoolsRes.data ?? []) as unknown as SchoolRow[]} open={sp.open ?? null}
+        categories={(catsRes.data ?? []) as { id: string; name_en: string }[]}
+        stages={(stagesRes.data ?? []) as { id: string; category_id: string; name_en: string }[]} />
+    </AppShell>
+  );
+}

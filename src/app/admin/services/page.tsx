@@ -1,0 +1,32 @@
+import { redirect } from "next/navigation";
+import { AppShell } from "@/components/app-shell";
+import { Flash } from "@/components/flash";
+import { getMe } from "@/lib/auth";
+import { AdminHeader } from "../tabs";
+import { AddService, ServicesTable, type ServiceRow } from "./services-table";
+
+export default async function ServicesPage({ searchParams }: { searchParams: Promise<{ open?: string; ok?: string; err?: string }> }) {
+  const { supabase: sb, me } = await getMe();
+  if (me.role !== "admin") redirect("/dashboard");
+  const sp = await searchParams;
+  const [catsRes, casesRes, teamsRes] = await Promise.all([
+    sb.from("categories").select(`id, name_en, name_th, points, estimated_value_thb, in_house, sort_order, active,
+      stages(id, name_en, sort_order, level, milestone, probability_pct, editable_by_team_id, active)`).order("sort_order"),
+    sb.from("cases").select("category_id"),
+    sb.from("teams").select("id, name").order("name"),
+  ]);
+  if (catsRes.error) throw new Error(catsRes.error.message);
+  const count = new Map<string, number>();
+  for (const c of casesRes.data ?? []) count.set(c.category_id, (count.get(c.category_id) ?? 0) + 1);
+  const rows = ((catsRes.data ?? []) as unknown as Omit<ServiceRow, "cases">[]).map((c) => ({
+    ...c, cases: count.get(c.id) ?? 0, stages: [...c.stages].sort((a, b) => a.sort_order - b.sort_order),
+  }));
+  return (
+    <AppShell active="/admin/services">
+      <AdminHeader active="/admin/services" />
+      <Flash ok={sp.ok} err={sp.err} />
+      <ServicesTable rows={rows} open={sp.open ?? null} teams={(teamsRes.data ?? []) as { id: string; name: string }[]} />
+      <AddService services={rows.map((r) => ({ id: r.id, name: r.name_en }))} />
+    </AppShell>
+  );
+}
