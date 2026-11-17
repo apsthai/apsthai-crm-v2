@@ -24,3 +24,7 @@ export function back(path: string, error?: { message: string } | string | null):
   const msg = typeof error === "string" ? error : error?.message;
   redirect(`${path}${path.includes("?") ? "&" : "?"}${msg ? `err=${encodeURIComponent(msg)}` : "ok=1"}`);
 }
+
+// A delete the database refused because another record points to it.
+export const inUse = (e: { message: string; code?: string } | null, what: string) =>
+  e && (e.code === "23503" || e.message.includes("foreign key")) ? `${what} is already used elsewhere, so it cannot be deleted` : e;

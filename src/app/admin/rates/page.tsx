@@ -6,13 +6,19 @@ import { Submit } from "@/components/submit";
 import { getMe } from "@/lib/auth";
 import { fmtDate, todayBangkok } from "@/lib/dates";
 import { AdminHeader } from "../tabs";
-import { saveRates } from "./actions";
+import { DeleteButton } from "@/components/delete-button";
+import { deleteRate, saveRates } from "./actions";
 
 export default async function RatesPage({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string }> }) {
   const { supabase: sb, me } = await getMe();
   if (me.role !== "admin") redirect("/dashboard");
   const sp = await searchParams;
-  const { data } = await sb.from("exchange_rates").select("currency, rate_thb, as_of").order("as_of", { ascending: false });
+  const [{ data }, ...usedRes] = await Promise.all([
+    sb.from("exchange_rates").select("currency, rate_thb, as_of").order("as_of", { ascending: false }),
+    sb.from("receivables").select("currency"), sb.from("invoices").select("currency"), sb.from("income_terms").select("currency"),
+  ]);
+  // A currency's only rate can be deleted only while nothing is in that currency.
+  const used = new Set(usedRes.flatMap((u) => (u.data ?? []).map((x) => x.currency as string)));
   const latest = new Map<string, { rate: number; asOf: string; prev?: number }>();
   for (const r of data ?? []) {
     const cur = latest.get(r.currency);
@@ -43,6 +49,7 @@ export default async function RatesPage({ searchParams }: { searchParams: Promis
               <th className="border-b border-slate-200 px-5 py-2.5 text-right font-semibold">Now</th>
               <th className="border-b border-slate-200 px-5 py-2.5 font-semibold">Since</th>
               <th className="border-b border-slate-200 px-5 py-2.5 font-semibold">New rate</th>
+              <th className="border-b border-slate-200 px-3 py-2.5" />
             </tr>
           </thead>
           <tbody>
@@ -58,6 +65,10 @@ export default async function RatesPage({ searchParams }: { searchParams: Promis
                   <input name={`rate_${cur}`} inputMode="decimal" placeholder={r.rate.toFixed(2)} aria-label={`New rate for ${cur}`}
                     className="w-28 rounded-lg border border-slate-300 px-2 py-1 text-right" />
                 </td>
+                <td className="border-b border-slate-100 px-3 py-2.5 text-right">
+                  {(r.prev !== undefined || !used.has(cur)) && <DeleteButton inForm small action={deleteRate.bind(null, cur, r.asOf)}
+                    question={r.prev !== undefined ? `Delete this rate? ${r.prev.toFixed(2)} is used again.` : `Delete ${cur}?`} />}
+                </td>
               </tr>
             ))}
             <tr>
@@ -65,6 +76,7 @@ export default async function RatesPage({ searchParams }: { searchParams: Promis
               <td className="px-5 py-2.5 text-right text-slate-400">-</td>
               <td className="px-5 py-2.5" />
               <td className="px-5 py-2.5"><input name="new_rate" inputMode="decimal" aria-label="Rate for the new currency" className="w-28 rounded-lg border border-slate-300 px-2 py-1 text-right" /></td>
+              <td />
             </tr>
           </tbody>
         </table>

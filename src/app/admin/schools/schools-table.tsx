@@ -4,11 +4,12 @@ import { useState } from "react";
 import { Field, inputCls } from "@/components/fields";
 import { Submit } from "@/components/submit";
 import { COUNTRIES, n2 } from "@/lib/fin";
-import { addSchoolService, saveSchool } from "./actions";
+import { DeleteButton } from "@/components/delete-button";
+import { addSchoolService, deleteSchool, deleteSchoolService, saveSchool } from "./actions";
 
 type Term = { id: string; seq: number; type: string; payer_type: string; rate_pct: number | null; amount: number | null; currency: string | null; repeat: string; trigger_stage_id: string | null };
-type Product = { id: string; active: boolean; category: { id: string; name_en: string } | null; terms: Term[] };
-export type SchoolRow = { id: string; name: string; country: string; type: string; default_currency: string | null; notes: string | null; active: boolean; products: Product[] };
+type Product = { id: string; active: boolean; category: { id: string; name_en: string } | null; terms: Term[]; canDelete?: boolean };
+export type SchoolRow = { id: string; name: string; country: string; type: string; default_currency: string | null; notes: string | null; active: boolean; products: Product[]; canDelete?: boolean };
 type Stage = { id: string; category_id: string; name_en: string };
 
 const TYPES = [["boarding_school", "Boarding school"], ["university", "University"], ["summer_provider", "Summer provider"],
@@ -123,8 +124,8 @@ function EditSchool({ school, products, categories, stages, onClose }:
             <table className="w-full min-w-[760px] border-collapse text-sm">
               <thead>
                 <tr className="text-left text-xs tracking-wide text-slate-500 uppercase">
-                  {["Service", "What it is", "Who pays", "How", "Rate or amount", "Counted at stage", "Repeats"].map((h) => (
-                    <th key={h} className="border-b border-slate-200 px-2 py-2 font-semibold">{h}</th>
+                  {["Service", "What it is", "Who pays", "How", "Rate or amount", "Counted at stage", "Repeats", ""].map((h, i) => (
+                    <th key={i} className="border-b border-slate-200 px-2 py-2 font-semibold">{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -156,6 +157,9 @@ function EditSchool({ school, products, categories, stages, onClose }:
                       <td className="border-b border-slate-100 px-2 py-2">
                         <select name={`repeat_${p.id}`} defaultValue={t?.repeat ?? "once"} className={sel}><option value="once">Once</option><option value="yearly">Every year</option><option value="termly">Every term</option></select>
                       </td>
+                      <td className="border-b border-slate-100 px-2 py-2 text-right">
+                        {p.canDelete && <DeleteButton inForm small action={deleteSchoolService.bind(null, p.id)} question={`Remove ${p.category!.name_en}?`} label="Remove" />}
+                      </td>
                     </tr>
                   );
                 })}
@@ -182,6 +186,12 @@ function EditSchool({ school, products, categories, stages, onClose }:
         <Field label="Rate or amount"><input name="value" defaultValue="10" inputMode="decimal" className={`${inputCls} w-28 text-right`} /></Field>
         <Submit variant="ghost">Add</Submit>
       </form>
+      {school.canDelete && (
+        <div className="flex flex-wrap items-center gap-2 border-t border-slate-200 pt-3 text-[13px] text-slate-500">
+          Added by mistake or a duplicate? No student uses it yet.
+          <DeleteButton action={deleteSchool} fields={{ id: school.id }} label="Delete this school" question={`Delete ${school.name}?`} />
+        </div>
+      )}
     </div>
   );
 }

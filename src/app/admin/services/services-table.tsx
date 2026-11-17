@@ -3,9 +3,10 @@
 import { useState } from "react";
 import { Field, inputCls } from "@/components/fields";
 import { Submit } from "@/components/submit";
-import { addService, moveService, moveStage, saveService } from "./actions";
+import { DeleteButton } from "@/components/delete-button";
+import { addService, deleteService, deleteStage, moveService, moveStage, saveService } from "./actions";
 
-type Stage = { id: string; name_en: string; sort_order: number; level: string; milestone: string; probability_pct: number; editable_by_team_id: string | null; active: boolean };
+type Stage = { id: string; name_en: string; sort_order: number; level: string; milestone: string; probability_pct: number; editable_by_team_id: string | null; active: boolean; canDelete?: boolean };
 export type ServiceRow = { id: string; name_en: string; name_th: string | null; points: number | null; estimated_value_thb: number | null;
   in_house: boolean; sort_order: number; active: boolean; cases: number; stages: Stage[] };
 
@@ -18,7 +19,7 @@ export function ServicesTable({ rows, open, teams }: { rows: ServiceRow[]; open:
       <div className="px-5 pt-4 pb-3">
         <h2 className="text-base font-semibold text-slate-900">Services</h2>
         <p className="mt-0.5 text-[13px] text-slate-500">
-          The order here is the order in New case. A service with cases cannot be deleted: hide it and it no longer shows for new cases. Old cases stay as they are.
+          The order here is the order in New case. A service no case uses can be deleted. One with cases can only be hidden: it no longer shows for new cases. Old cases stay as they are.
         </p>
       </div>
       <div className="overflow-x-auto">
@@ -106,8 +107,8 @@ function EditService({ row, teams, onClose }: { row: ServiceRow; teams: { id: st
         <table className="w-full min-w-[760px] border-collapse text-sm">
           <thead>
             <tr className="text-left text-xs tracking-wide text-slate-500 uppercase">
-              {["Order", "Stage", "Chance of closing", "Per", "Success", "Also updated by", "Shown"].map((h) => (
-                <th key={h} className="border-b border-slate-200 px-2 py-2 font-semibold">{h}</th>
+              {["Order", "Stage", "Chance of closing", "Per", "Success", "Also updated by", "Shown", ""].map((h, i) => (
+                <th key={i} className="border-b border-slate-200 px-2 py-2 font-semibold">{h}</th>
               ))}
             </tr>
           </thead>
@@ -137,13 +138,16 @@ function EditService({ row, teams, onClose }: { row: ServiceRow; teams: { id: st
                 <td className="border-b border-slate-100 px-2 py-2">
                   <input type="checkbox" name={`shown_${x.id}`} value="1" defaultChecked={x.active} aria-label={`Show ${x.name_en}`} className="size-4 accent-navy" />
                 </td>
+                <td className="border-b border-slate-100 px-2 py-2 text-right">
+                  {x.canDelete && <DeleteButton inForm small action={deleteStage.bind(null, x.id)} question={`Delete ${x.name_en}?`} />}
+                </td>
               </tr>
             ))}
             <tr>
               <td className="px-2 py-2 text-xs text-slate-500">New</td>
               <td className="px-2 py-2"><input name="new_stage" placeholder="+ Add a stage" className={`${sel} w-44`} /></td>
               <td className="px-2 py-2"><input name="new_prob" placeholder="0" inputMode="decimal" className={`${sel} w-20 text-right`} /> %</td>
-              <td className="px-2 py-2" colSpan={4}>
+              <td className="px-2 py-2" colSpan={5}>
                 <select name="new_level" defaultValue="case" className={sel}><option value="case">Per case</option><option value="application">Per school</option></select>
                 <span className="ml-2 text-xs text-slate-500">Added at the end. Use the arrows to move it.</span>
               </td>
@@ -155,6 +159,7 @@ function EditService({ row, teams, onClose }: { row: ServiceRow; teams: { id: st
         <Submit>Save</Submit>
         <button type="button" onClick={onClose} className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-600">Cancel</button>
         <span className="text-xs text-slate-500">{row.cases} {row.cases === 1 ? "case uses" : "cases use"} this service.</span>
+        {row.cases === 0 && <span className="ml-auto"><DeleteButton inForm action={deleteService} label="Delete this service" question={`Delete ${row.name_en} and its stages?`} /></span>}
       </div>
     </form>
   );

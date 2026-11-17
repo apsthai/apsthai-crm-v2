@@ -1,7 +1,7 @@
 "use server";
 
 import { todayBangkok } from "@/lib/dates";
-import { adminDb, back, num, s } from "../shared";
+import { adminDb, back, inUse, num, s } from "../shared";
 
 // The term fields for one service of a school, named <field>_<productId>.
 function termFrom(fd: FormData, pid: string) {
@@ -59,4 +59,34 @@ export async function addSchoolService(fd: FormData) {
     currency: school?.default_currency ?? "GBP",
   });
   back2(t.error);
+}
+
+// Bound to a service's Delete button inside the school form. Only when no student applied to it; its rate goes with it.
+export async function deleteSchoolService(productId: string, fd: FormData) {
+  const sb = await adminDb();
+  const schoolId = s(fd, "id")!;
+  const { count } = await sb.from("applications").select("id", { count: "exact", head: true }).eq("product_id", productId);
+  if (count) return back(`/admin/schools?open=${schoolId}`, "Students applied to this, so it cannot be deleted");
+  const { error } = await sb.from("products").delete().eq("id", productId).eq("school_id", schoolId);
+  back(`/admin/schools?open=${schoolId}`, inUse(error, "This service"));
+}
+
+// Only for a school nothing uses: no student applied, no one studies there, no invoice or payer.
+export async function deleteSchool(fd: FormData) {
+  const sb = await adminDb();
+  const id = s(fd, "id")!;
+  const { data: prods } = await sb.from("products").select("id").eq("school_id", id);
+  const ids = (prods ?? []).map((p) => p.id as string);
+  const checks = await Promise.all([
+    ids.length ? sb.from("applications").select("id", { count: "exact", head: true }).in("product_id", ids) : { count: 0 },
+    sb.from("education").select("id", { count: "exact", head: true }).eq("school_id", id),
+    sb.from("payers").select("id", { count: "exact", head: true }).eq("school_id", id),
+  ]);
+  if (checks.some((c) => c.count)) return back(`/admin/schools?open=${id}`, "This school is already used by students or invoices, so it cannot be deleted");
+  if (ids.length) {
+    const p = await sb.from("products").delete().eq("school_id", id);
+    if (p.error) return back(`/admin/schools?open=${id}`, inUse(p.error, "This school"));
+  }
+  const { error } = await sb.from("schools").delete().eq("id", id);
+  back(error ? `/admin/schools?open=${id}` : "/admin/schools", inUse(error, "This school"));
 }

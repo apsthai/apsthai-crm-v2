@@ -5,10 +5,11 @@ import { MonthPick } from "@/components/date-pick";
 import { Field, inputCls } from "@/components/fields";
 import { Submit } from "@/components/submit";
 import { fmtMonth } from "@/lib/dates";
-import { addRule } from "./actions";
+import { DeleteButton } from "@/components/delete-button";
+import { addRule, deleteRule } from "./actions";
 
 export type RuleRow = { id: string; category_id: string; revenue_type: string; method: string; value: number | null; recipient: string;
-  team_id: string | null; count_when: string; count_stage_id: string | null; cycle: string; effective_intake: string };
+  team_id: string | null; count_when: string; count_stage_id: string | null; cycle: string; effective_intake: string; canDelete?: boolean };
 type Opt = { id: string; name_en: string };
 const REV: Record<string, string> = { commission: "Commission", service_fee: "Service fee", bonus: "Bonus" };
 const CYCLE: Record<string, string> = { next_month: "Next month", same_month: "Same month", quarterly: "Every quarter" };
@@ -72,7 +73,12 @@ export function RulesTable({ rules, categories, teams, stages, thisYear }:
                         <td className="border-b border-slate-100 px-4 py-2.5">{when(r)}</td>
                         <td className="border-b border-slate-100 px-4 py-2.5">{CYCLE[r.cycle]}</td>
                         <td className="border-b border-slate-100 px-4 py-2.5">{fmtMonth(r.effective_intake)}</td>
-                        <td className="border-b border-slate-100 px-4 py-2.5 text-right">{i === 0 && <NewBtn open={isOpen} onClick={() => setOpen(isOpen ? null : c.id)} />}</td>
+                        <td className="border-b border-slate-100 px-4 py-2.5 text-right">
+                          <span className="inline-flex flex-wrap items-center justify-end gap-2">
+                            {r.canDelete && <DeleteButton small action={deleteRule} fields={{ id: r.id }} question={`Delete this rule from ${fmtMonth(r.effective_intake)}?`} />}
+                            {i === 0 && <NewBtn open={isOpen} onClick={() => setOpen(isOpen ? null : c.id)} />}
+                          </span>
+                        </td>
                       </tr>
                     );
                   })}

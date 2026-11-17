@@ -1,6 +1,6 @@
 "use server";
 
-import { adminDb, back, num, s } from "../shared";
+import { adminDb, back, inUse, num, s } from "../shared";
 
 // A new rate is a new rule from an intake. The old rule stays, so cases with an earlier intake keep theirs.
 export async function addRule(fd: FormData) {
@@ -22,4 +22,17 @@ export async function addRule(fd: FormData) {
   });
   back("/admin/rules", error?.message.includes("unique")
     ? "There is already a rule for this service from that intake. Choose a later intake." : error);
+}
+
+// Only for a rule no case falls under yet (no case of that service from its intake on) and not used in a payout.
+export async function deleteRule(fd: FormData) {
+  const sb = await adminDb();
+  const id = s(fd, "id")!;
+  const { data: r } = await sb.from("payout_rules").select("category_id, effective_intake").eq("id", id).single();
+  if (!r) return back("/admin/rules", "Rule not found");
+  const { count } = await sb.from("cases").select("id", { count: "exact", head: true })
+    .eq("category_id", r.category_id).gte("intake", r.effective_intake);
+  if (count) return back("/admin/rules", "Cases already fall under this rule, so add a new rate instead");
+  const { error } = await sb.from("payout_rules").delete().eq("id", id);
+  back("/admin/rules", inUse(error, "This rule"));
 }

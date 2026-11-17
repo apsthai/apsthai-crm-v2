@@ -1,6 +1,6 @@
 "use server";
 
-import { adminDb, back, num, s } from "../shared";
+import { adminDb, back, inUse, num, s } from "../shared";
 
 const USERNAME = /^[a-z0-9][a-z0-9._-]{1,30}$/;
 
@@ -49,4 +49,18 @@ export async function saveKpi(fd: FormData) {
     if (res.error) return back(`/admin/staff?cycle=${cycle.slice(0, 4)}`, res.error);
   }
   back(`/admin/staff?cycle=${cycle.slice(0, 4)}`);
+}
+
+// Only for someone added by mistake: no login and never on a case. Their KPI and team rows go with them.
+export async function deleteStaff(fd: FormData) {
+  const sb = await adminDb();
+  const id = s(fd, "id")!;
+  const { data: st } = await sb.from("staff").select("auth_user_id").eq("id", id).single();
+  if (st?.auth_user_id) return back("/admin/staff", "This person has a login. Switch the login off instead");
+  const { count } = await sb.from("case_staff").select("id", { count: "exact", head: true }).eq("staff_id", id);
+  if (count) return back("/admin/staff", "This person is on cases, so they cannot be deleted");
+  await sb.from("kpi_targets").delete().eq("staff_id", id);
+  await sb.from("team_members").delete().eq("staff_id", id);
+  const { error } = await sb.from("staff").delete().eq("id", id);
+  back("/admin/staff", inUse(error, "This person"));
 }

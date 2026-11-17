@@ -5,11 +5,12 @@ import { useState } from "react";
 import { Field, inputCls } from "@/components/fields";
 import { Submit } from "@/components/submit";
 import { LoginActions } from "./login-actions";
-import { addStaff, saveKpi, updateStaff } from "./staff-actions";
+import { DeleteButton } from "@/components/delete-button";
+import { addStaff, deleteStaff, saveKpi, updateStaff } from "./staff-actions";
 
 export type StaffRow = {
   id: string; codename: string; firstname: string | null; lastname: string | null; username: string; role: string;
-  org: string; employment: string; handles_cases: boolean; active: boolean; auth_user_id: string | null; kpi: number | null;
+  org: string; employment: string; handles_cases: boolean; active: boolean; auth_user_id: string | null; kpi: number | null; canDelete: boolean;
 };
 const TYPE: Record<string, string> = { full_time: "Full-time", part_time: "Part-time" };
 const cycleLabel = (c: string) => `${c.slice(0, 4)}-${String((Number(c.slice(0, 4)) + 1) % 100).padStart(2, "0")}`;
@@ -99,6 +100,12 @@ export function StaffTable({ rows, cycle, cycles, meId }: { rows: StaffRow[]; cy
                         <div className="flex flex-[1_1_220px] flex-col gap-2 border-slate-200 sm:border-l sm:pl-6">
                           <span className="text-sm font-medium text-slate-700">Login · <span className="font-mono">{r.username}</span></span>
                           <LoginActions staffId={r.id} username={r.username} hasLogin={!!r.auth_user_id} active={r.active} isMe={r.id === meId} />
+                          {r.canDelete && (
+                            <div className="mt-2 border-t border-slate-100 pt-3">
+                              <span className="mb-1.5 block text-[13px] text-slate-500">Added by mistake? No login and no cases yet.</span>
+                              <DeleteButton action={deleteStaff} fields={{ id: r.id }} label="Delete this person" question={`Delete ${r.codename}?`} />
+                            </div>
+                          )}
                         </div>
                       </div>
                     </td>

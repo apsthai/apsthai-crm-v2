@@ -23,3 +23,17 @@ export async function saveRates(fd: FormData) {
   const { error } = await sb.from("exchange_rates").upsert(rows, { onConflict: "currency,as_of" });
   back("/admin/rates", error);
 }
+
+// Bound to the Delete button of a currency's newest rate: the one before it is used again.
+// A currency's only rate can go only when no amount, invoice or school rate is in that currency.
+export async function deleteRate(currency: string, asOf: string) {
+  const sb = await adminDb();
+  const { count: older } = await sb.from("exchange_rates").select("currency", { count: "exact", head: true }).eq("currency", currency).lt("as_of", asOf);
+  if (!older) {
+    const used = await Promise.all(["receivables", "invoices", "income_terms"].map((t) =>
+      sb.from(t).select("id", { count: "exact", head: true }).eq("currency", currency)));
+    if (used.some((u) => u.count)) return back("/admin/rates", `${currency} is already used, so keep at least one rate`);
+  }
+  const { error } = await sb.from("exchange_rates").delete().eq("currency", currency).eq("as_of", asOf);
+  back("/admin/rates", error);
+}

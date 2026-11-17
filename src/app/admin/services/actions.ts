@@ -1,6 +1,6 @@
 "use server";
 
-import { adminDb, back, num, s } from "../shared";
+import { adminDb, back, inUse, num, s } from "../shared";
 
 const go = (id: string | null, e?: string | { message: string } | null) => back(`/admin/services${id ? `?open=${id}` : ""}`, e);
 
@@ -91,4 +91,34 @@ export async function moveStage(which: string, fd: FormData) {
   const [sid, dir] = which.split(":");
   const e = await move("stages", sid, dir, { col: "category_id", val: cat });
   go(cat, e);
+}
+
+// Only for a service no case uses. Its stages, rules and school links go with it.
+export async function deleteService(fd: FormData) {
+  const sb = await adminDb();
+  const id = s(fd, "id")!;
+  const { count } = await sb.from("cases").select("id", { count: "exact", head: true }).eq("category_id", id);
+  if (count) return go(id, "Cases use this service. Hide it instead");
+  const steps = [
+    () => sb.from("categories").update({ default_trigger_stage_id: null }).eq("id", id),
+    () => sb.from("payout_rules").delete().eq("category_id", id),
+    () => sb.from("products").delete().eq("category_id", id),
+    () => sb.from("stages").delete().eq("category_id", id),
+    () => sb.from("categories").delete().eq("id", id),
+  ];
+  for (const step of steps) {
+    const { error } = await step();
+    if (error) return go(id, inUse(error, "This service"));
+  }
+  go(null);
+}
+
+// Bound to a stage's Delete button inside the service form. Only for a stage no case has reached and nothing counts at.
+export async function deleteStage(stageId: string, fd: FormData) {
+  const sb = await adminDb();
+  const cat = s(fd, "id")!;
+  const { data: st } = await sb.from("stages").select("milestone").eq("id", stageId).single();
+  if (st?.milestone === "success") return go(cat, "This is the success stage. Choose another success stage first");
+  const { error } = await sb.from("stages").delete().eq("id", stageId).eq("category_id", cat);
+  go(cat, inUse(error, "This stage") && "A case or a school rate uses this stage. Untick Shown instead");
 }

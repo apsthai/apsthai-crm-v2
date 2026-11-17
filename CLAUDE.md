@@ -12,6 +12,7 @@ The database in Supabase was kept and is the source of truth.
 - Build only the screen the owner has designed and approved. Do not add screens or features he has not asked for.
 - Test every screen yourself end to end (with obviously fake TEST data, deleted afterwards) before showing it.
 - Ask before adding any library.
+- Anything that can be added can also be deleted while nothing else uses it yet (owner's rule, 17 Nov 2026). Show Delete only then, with a second click to confirm; once used, offer hide / switch off / cancel instead. The database foreign keys are the backstop.
 
 ## Stack
 - Next.js (App Router), TypeScript, Tailwind CSS v4.
