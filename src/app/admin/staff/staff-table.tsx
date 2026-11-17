@@ -102,7 +102,7 @@ export function StaffTable({ rows, cycle, cycles, meId }: { rows: StaffRow[]; cy
                           <LoginActions staffId={r.id} username={r.username} hasLogin={!!r.auth_user_id} active={r.active} isMe={r.id === meId} />
                           {r.canDelete && (
                             <div className="mt-2 border-t border-slate-100 pt-3">
-                              <span className="mb-1.5 block text-[13px] text-slate-500">Added by mistake? No login and no cases yet.</span>
+                              <span className="mb-1.5 block text-[13px] text-slate-500">Added by mistake? No login, no cases and no team yet.</span>
                               <DeleteButton action={deleteStaff} fields={{ id: r.id }} label="Delete this person" question={`Delete ${r.codename}?`} />
                             </div>
                           )}

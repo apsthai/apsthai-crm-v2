@@ -51,16 +51,18 @@ export async function saveKpi(fd: FormData) {
   back(`/admin/staff?cycle=${cycle.slice(0, 4)}`);
 }
 
-// Only for someone added by mistake: no login and never on a case. Their KPI and team rows go with them.
+// Only for someone added by mistake: no login, never on a case, not in a team. Their KPI goes with them.
 export async function deleteStaff(fd: FormData) {
   const sb = await adminDb();
   const id = s(fd, "id")!;
   const { data: st } = await sb.from("staff").select("auth_user_id").eq("id", id).single();
   if (st?.auth_user_id) return back("/admin/staff", "This person has a login. Switch the login off instead");
-  const { count } = await sb.from("case_staff").select("id", { count: "exact", head: true }).eq("staff_id", id);
-  if (count) return back("/admin/staff", "This person is on cases, so they cannot be deleted");
+  const [cs, tm] = await Promise.all([
+    sb.from("case_staff").select("id", { count: "exact", head: true }).eq("staff_id", id),
+    sb.from("team_members").select("staff_id", { count: "exact", head: true }).eq("staff_id", id),
+  ]);
+  if (cs.count || tm.count) return back("/admin/staff", "This person is on cases or in a team, so they cannot be deleted");
   await sb.from("kpi_targets").delete().eq("staff_id", id);
-  await sb.from("team_members").delete().eq("staff_id", id);
   const { error } = await sb.from("staff").delete().eq("id", id);
   back("/admin/staff", inUse(error, "This person"));
 }

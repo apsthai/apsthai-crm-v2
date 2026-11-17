@@ -16,14 +16,16 @@ export default async function StaffPage({ searchParams }: { searchParams: Promis
   const current = cycleOf(todayBangkok());
   const cycle = /^\d{4}$/.test(sp.cycle ?? "") ? `${sp.cycle}-09-01` : current;
 
-  const [staffRes, kpiRes, cyclesRes, onCaseRes] = await Promise.all([
+  const [staffRes, kpiRes, cyclesRes, onCaseRes, teamRes] = await Promise.all([
     sb.from("staff").select("id, codename, firstname, lastname, username, role, org, employment, handles_cases, active, auth_user_id")
       .order("active", { ascending: false }).order("codename"),
     sb.from("kpi_targets").select("staff_id, points").eq("cycle_start", cycle),
     sb.from("kpi_targets").select("cycle_start"),
     sb.from("case_staff").select("staff_id"),
+    sb.from("team_members").select("staff_id"),
   ]);
-  const onCase = new Set((onCaseRes.data ?? []).map((c) => c.staff_id as string));
+  // In use = on a case or in a team. Only someone with neither (and no login) can be deleted.
+  const onCase = new Set([...(onCaseRes.data ?? []), ...(teamRes.data ?? [])].map((c) => c.staff_id as string));
   if (staffRes.error) throw new Error(staffRes.error.message);
   const kpi = new Map((kpiRes.data ?? []).map((k) => [k.staff_id as string, Number(k.points)]));
   const cycles = [...new Set([current, ...(cyclesRes.data ?? []).map((c) => c.cycle_start as string), cycle])].sort().reverse();
