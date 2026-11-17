@@ -26,5 +26,6 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|logo.png).*)"],
+  // /api/mcp is the advisor connector: it checks its own secret link and never uses a Supabase session.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|logo.png|api/mcp/).*)"],
 };

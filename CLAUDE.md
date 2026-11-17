@@ -32,5 +32,15 @@ The database in Supabase was kept and is the source of truth.
 - "Today" is Asia/Bangkok: `today_bangkok()` in SQL.
 - Students are often under 18 (PDPA). Never commit real data or exports, never log personal data.
 
+## Advisor connector (owner-approved 17 Nov 2026)
+- `/api/mcp/[token]` is a read-only MCP connector for the organisation's advisor (Bee7). It checks `ADVISOR_MCP_TOKEN`
+  and connects to Postgres as `advisor_ro` via `ADVISOR_DATABASE_URL` (the `pg` library), never with Supabase keys.
+- `advisor_ro` can only SELECT the views in schema `analytics` (default privileges grant new views automatically).
+  The grant is the real guard; never grant it anything in `public`. Each query also runs alone in a READ ONLY transaction.
+- The views run as their owner, so the advisor sees what the owner sees, EXCEPT contact details: never put phone, email,
+  LINE, date of birth, parents / guardians, family payer names, referrer names or usernames in `analytics`.
+  Change the views only with a migration.
+- Never log query text, parameters or rows from the connector. Tool errors go back to the caller, not to logs.
+
 ## Before a PR
 `npm run lint` and `npm run build`.
