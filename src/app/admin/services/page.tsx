@@ -11,7 +11,7 @@ export default async function ServicesPage({ searchParams }: { searchParams: Pro
   const sp = await searchParams;
   const [catsRes, casesRes, teamsRes] = await Promise.all([
     sb.from("categories").select(`id, name_en, name_th, points, estimated_value_thb, in_house, sort_order, active,
-      stages(id, name_en, sort_order, level, milestone, probability_pct, editable_by_team_id, active)`).order("sort_order"),
+      stages!stages_category_id_fkey(id, name_en, sort_order, level, milestone, probability_pct, editable_by_team_id, active)`).order("sort_order"),
     sb.from("cases").select("category_id"),
     sb.from("teams").select("id, name").order("name"),
   ]);
