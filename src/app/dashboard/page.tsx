@@ -1,30 +1,42 @@
-import Link from "next/link";
-import { AppShell, Bar, Card, SectionLabel, Tile } from "@/components/app-shell";
+import { AppShell, Bar, Card, Tile } from "@/components/app-shell";
 import { getMe } from "@/lib/auth";
 import { cycleOf, fmtDate, fmtLongDate, fmtMonth, fmtMonthShort, hourBangkok, todayBangkok } from "@/lib/dates";
-import { fmtPoints, fmtTHB, fmtTHBShort, incomeOf, vatOf } from "@/lib/money";
+import { fmtPoints, fmtTHBShort } from "@/lib/money";
 import { loadAdmin, loadCompany, loadMine, type TaskRow } from "./data";
+import { FlightDeck } from "./flight-deck";
+import { loadFlightDeck } from "./flight-data";
 
 export default async function Dashboard() {
   const { supabase, me } = await getMe();
   const today = todayBangkok();
   const cycle = cycleOf(today);
   const isAdmin = me.role === "admin";
-  const [mine, company, admin] = await Promise.all([
+  const [mine, company, admin, fd] = await Promise.all([
     loadMine(supabase, me.id, today, cycle),
     loadCompany(supabase, cycle),
     isAdmin ? loadAdmin(supabase, today, cycle) : Promise.resolve(null),
+    isAdmin ? loadFlightDeck(supabase, today, cycle) : Promise.resolve(null),
   ]);
   const h = hourBangkok();
   const greeting = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 
   return (
     <AppShell name={me.codename} active="/dashboard">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">{greeting}, {me.codename}</h1>
-        <p className="mt-1 text-sm text-slate-500">{fmtLongDate(today)} · {cycle.label}</p>
-      </div>
-      {admin ? <AdminView admin={admin} mine={mine} today={today} cycle={cycle.label} />
+      {fd ? (
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-900">Flight Deck</h1>
+            <p className="mt-1 text-sm text-slate-500">{fmtLongDate(today)} · {cycle.label} · day {fd.day} of {fd.total} ({Math.round(fd.frac * 100)}% of the cycle gone)</p>
+          </div>
+          <span className="text-[13px] text-slate-500">{greeting}, {me.codename}</span>
+        </div>
+      ) : (
+        <div>
+          <h1 className="text-2xl font-semibold text-slate-900">{greeting}, {me.codename}</h1>
+          <p className="mt-1 text-sm text-slate-500">{fmtLongDate(today)} · {cycle.label}</p>
+        </div>
+      )}
+      {admin && fd ? <AdminView admin={admin} fd={fd} mine={mine} />
         : <StaffView mine={mine} company={company} cycle={cycle.label} />}
     </AppShell>
   );
@@ -32,6 +44,7 @@ export default async function Dashboard() {
 
 type Mine = Awaited<ReturnType<typeof loadMine>>;
 type Admin = NonNullable<Awaited<ReturnType<typeof loadAdmin>>>;
+type FD = NonNullable<Awaited<ReturnType<typeof loadFlightDeck>>>;
 
 function StaffView({ mine, company, cycle }: { mine: Mine; company: Awaited<ReturnType<typeof loadCompany>>; cycle: string }) {
   const kpiPct = mine.kpi ? (mine.points / mine.kpi) * 100 : 0;
@@ -105,8 +118,7 @@ function StaffView({ mine, company, cycle }: { mine: Mine; company: Awaited<Retu
   );
 }
 
-function AdminView({ admin, mine, today, cycle }: { admin: Admin; mine: Mine; today: string; cycle: string }) {
-  const a = admin.attention;
+function AdminView({ admin, fd, mine }: { admin: Admin; fd: FD; mine: Mine }) {
   const max = Math.max(1, ...admin.forecast.map((f) => f.confirmed + f.pipeline));
   const maxPipe = Math.max(1, ...admin.pipeline.map((p) => p.thb));
   return (
@@ -117,41 +129,7 @@ function AdminView({ admin, mine, today, cycle }: { admin: Admin; mine: Mine; to
         </p>
       )}
 
-      <section className="flex flex-col gap-3">
-        <SectionLabel>Needs your attention</SectionLabel>
-        <div className="flex flex-wrap gap-3">
-          <Tile label="Success waiting for approval" value={String(a.approvals)} tone="navy"
-            sub={a.approvals ? a.approvalServices.join(", ") : "Nothing waiting"} />
-          <Tile label="Overdue money from payers" value={String(a.overdueCount)} tone={a.overdueCount ? "red" : "ink"}
-            sub={a.overdueCount ? `${fmtTHB(a.overdueTHB)} incl. VAT, past the expected date` : "Nothing overdue"} />
-          <Tile label="Next payout round" value={a.payout ? fmtTHB(a.payout.total) : "None"}
-            sub={a.payout ? `Commission, no VAT · pay ${fmtDate(a.payout.date)} · ${a.payout.people} payees · ${a.payout.reviewed} reviewed` : "No payout waiting"} />
-          <Tile label="Active cases with no open task" value={String(a.noTask)} tone={a.noTask ? "red" : "ink"}
-            sub="Nothing scheduled to do next" />
-          <Link href="/financial" className="contents">
-            <Tile label="Money to follow up" value={String(a.followUps)} tone={a.followUps ? "red" : "ink"}
-              sub={a.followUps ? "Reminder date reached · To collect" : "No reminders due"} />
-          </Link>
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <SectionLabel>Money (THB)</SectionLabel>
-          <span className="text-[13px] text-slate-500">Big numbers include 7% VAT. Income is what is left after VAT.</span>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <MoneyTile label="Received this month" gross={admin.money.receivedMonth.gross} vat={admin.money.receivedMonth.vat}
-            income={admin.money.receivedMonth.income} wht={admin.money.receivedMonth.wht} note={fmtMonth(today)} />
-          <MoneyTile label={`Received ${cycle}`} gross={admin.money.receivedCycle.gross} vat={admin.money.receivedCycle.vat}
-            income={admin.money.receivedCycle.income} wht={admin.money.receivedCycle.wht} note="So far" />
-          <MoneyTile label="Due in the next 60 days" gross={admin.money.next60} vat={vatOf(admin.money.next60)}
-            income={incomeOf(admin.money.next60)} note="Confirmed, not paid yet" />
-          <MoneyTile label={`Still to come ${cycle}`} gross={admin.money.owedInCycle + admin.money.weightedInCycle}
-            vat={vatOf(admin.money.owedInCycle + admin.money.weightedInCycle)} income={incomeOf(admin.money.owedInCycle + admin.money.weightedInCycle)}
-            note={`${fmtTHBShort(admin.money.owedInCycle)} confirmed + ${fmtTHBShort(admin.money.weightedInCycle)} pipeline`} />
-        </div>
-      </section>
+      <FlightDeck fd={fd} />
 
       <div className="flex flex-wrap items-stretch gap-6">
         <Card title="Forecast, next 6 months" sub="Incl. VAT" className="flex-[3_1_520px]"
@@ -195,34 +173,6 @@ function AdminView({ admin, mine, today, cycle }: { admin: Admin; mine: Mine; to
         </Card>
       </div>
 
-      <Card title={`Team performance, ${cycle}`} right={`Team total: ${fmtPoints(admin.teamPoints)} points`}>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[820px] border-collapse text-sm whitespace-nowrap">
-            <thead>
-              <tr className="text-left text-xs tracking-wide text-slate-500 uppercase">
-                {["Staff", "Active cases", "Due today", "Overdue", "Successful", "Points / KPI", "To go", "Pipeline × probability (incl. VAT)"].map((h, i) => (
-                  <th key={h} className={`border-b border-slate-200 px-3 py-2.5 font-semibold ${i ? "text-right" : ""}`}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {admin.team.map((s) => (
-                <tr key={s.name}>
-                  <td className="border-b border-slate-100 px-3 py-2.5 font-medium whitespace-nowrap">{s.name}{s.partTime && <span className="ml-2 text-xs font-normal whitespace-nowrap text-slate-500">Part-time</span>}</td>
-                  <td className="border-b border-slate-100 px-3 py-2.5 text-right">{s.active}</td>
-                  <td className="border-b border-slate-100 px-3 py-2.5 text-right">{s.today}</td>
-                  <td className={`border-b border-slate-100 px-3 py-2.5 text-right ${s.overdue ? "font-semibold text-brand-red" : ""}`}>{s.overdue}</td>
-                  <td className="border-b border-slate-100 px-3 py-2.5 text-right">{s.successful}</td>
-                  <td className="border-b border-slate-100 px-3 py-2.5 text-right font-semibold text-navy">{fmtPoints(s.points)}{s.kpi !== null ? ` / ${fmtPoints(s.kpi)}` : ""}</td>
-                  <td className="border-b border-slate-100 px-3 py-2.5 text-right text-brand-red">{s.toGo !== null ? fmtPoints(s.toGo) : <span className="text-slate-400">No KPI</span>}</td>
-                  <td className="border-b border-slate-100 px-3 py-2.5 text-right">{fmtTHBShort(s.pipeline)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Card>
-
       <Card title="My work today"
         right={`${mine.tasks.dueToday} due today · ${mine.tasks.overdue} overdue · ${mine.activeCases} active cases`}>
         <TaskList tasks={mine.tasks.now} empty="Nothing overdue or due today." />
@@ -230,22 +180,6 @@ function AdminView({ admin, mine, today, cycle }: { admin: Admin; mine: Mine; to
 
       <Waiting mine={mine} />
     </>
-  );
-}
-
-function MoneyTile({ label, gross, vat, income, wht, note }:
-  { label: string; gross: number; vat: number; income: number; wht?: number; note: string }) {
-  return (
-    <div className="flex min-w-0 flex-[1_1_220px] flex-col gap-1 rounded-xl border border-slate-200 bg-white px-[18px] py-4">
-      <span className="text-[13px] text-slate-500">{label}</span>
-      <span className="text-[26px] leading-tight font-semibold text-slate-900">{fmtTHB(gross)} <span className="text-xs font-normal text-slate-500">incl. VAT</span></span>
-      <div className="mt-1 flex flex-col gap-0.5 border-t border-slate-100 pt-2 text-[13px]">
-        <div className="flex justify-between text-slate-500"><span>VAT 7%</span><span>{fmtTHB(vat)}</span></div>
-        {wht ? <div className="flex justify-between text-slate-500"><span>Withheld tax (in the total)</span><span>{fmtTHB(wht)}</span></div> : null}
-        <div className="flex justify-between font-semibold text-navy"><span>Income (no VAT)</span><span>{fmtTHB(income)}</span></div>
-      </div>
-      <span className="text-[13px] text-slate-500">{note}</span>
-    </div>
   );
 }
 

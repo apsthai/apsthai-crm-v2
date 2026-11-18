@@ -1,7 +1,7 @@
 import Link from "next/link";
 
 const TABS = [["/admin/staff", "Staff & KPI"], ["/admin/schools", "Schools & rates"], ["/admin/services", "Services"],
-  ["/admin/rules", "Team commission"], ["/admin/rates", "Exchange rates"]];
+  ["/admin/rules", "Team commission"], ["/admin/rates", "Exchange rates"], ["/admin/targets", "Targets"]];
 
 export function AdminHeader({ active }: { active: string }) {
   return (
