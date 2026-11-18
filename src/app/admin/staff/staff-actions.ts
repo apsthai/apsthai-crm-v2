@@ -1,8 +1,11 @@
 "use server";
 
+import { getMe } from "@/lib/auth";
 import { adminDb, back, inUse, num, s } from "../shared";
 
 const USERNAME = /^[a-z0-9][a-z0-9._-]{1,30}$/;
+// Staff works on own cases; viewer sees everything and changes nothing (the advisor); admin runs the system.
+const roleOf = (fd: FormData) => (["admin", "viewer"].includes(s(fd, "role") ?? "") ? s(fd, "role")! : "staff");
 
 export async function addStaff(fd: FormData) {
   const sb = await adminDb();
@@ -13,7 +16,7 @@ export async function addStaff(fd: FormData) {
   const { data, error } = await sb.from("staff").insert({
     codename, firstname: s(fd, "firstname"), lastname: s(fd, "lastname"), username,
     org: s(fd, "org") ?? "APSworld", employment: s(fd, "employment") ?? "part_time",
-    handles_cases: fd.get("handles_cases") !== "no", role: "staff",
+    role: roleOf(fd), handles_cases: roleOf(fd) !== "viewer" && fd.get("handles_cases") !== "no",
   }).select("id").single();
   if (error) return back("/admin/staff", error.message.includes("unique") ? "That nickname or username is already used" : error);
   const kpi = num(fd, "kpi");
@@ -28,9 +31,13 @@ export async function updateStaff(fd: FormData) {
   const sb = await adminDb();
   const id = s(fd, "id")!;
   if (!s(fd, "codename") || !s(fd, "firstname") || !s(fd, "lastname")) return back("/admin/staff", "Enter the nickname, first name and last name");
+  // Your own access is not changed here (its box is disabled), so admin cannot lock themselves out.
+  const { me } = await getMe();
+  const role = id === me.id ? undefined : roleOf(fd);
   const { error } = await sb.from("staff").update({
     codename: s(fd, "codename"), firstname: s(fd, "firstname"), lastname: s(fd, "lastname"),
-    org: s(fd, "org"), employment: s(fd, "employment"), handles_cases: fd.get("handles_cases") !== "no",
+    org: s(fd, "org"), employment: s(fd, "employment"),
+    handles_cases: role !== "viewer" && fd.get("handles_cases") !== "no", ...(role ? { role } : {}),
   }).eq("id", id);
   back("/admin/staff", error?.message.includes("unique") ? "That nickname is already used" : error);
 }

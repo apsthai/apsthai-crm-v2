@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { Flash } from "@/components/flash";
-import { getMe } from "@/lib/auth";
+import { getMe, seesAll } from "@/lib/auth";
 import { todayBangkok } from "@/lib/dates";
 import { AdminHeader } from "../tabs";
 import { AddStaff, StaffTable, type StaffRow } from "./staff-table";
@@ -11,7 +11,7 @@ const cycleOf = (iso: string) => `${Number(iso.slice(0, 4)) - (Number(iso.slice(
 
 export default async function StaffPage({ searchParams }: { searchParams: Promise<{ cycle?: string; ok?: string; err?: string }> }) {
   const { supabase: sb, me } = await getMe();
-  if (me.role !== "admin") redirect("/dashboard");
+  if (!seesAll(me)) redirect("/dashboard");
   const sp = await searchParams;
   const current = cycleOf(todayBangkok());
   const cycle = /^\d{4}$/.test(sp.cycle ?? "") ? `${sp.cycle}-09-01` : current;

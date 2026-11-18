@@ -5,7 +5,7 @@ import { DatePick } from "@/components/date-pick";
 import { Field, inputCls } from "@/components/fields";
 import { Flash } from "@/components/flash";
 import { Submit } from "@/components/submit";
-import { getMe } from "@/lib/auth";
+import { getMe, seesAll } from "@/lib/auth";
 import { addMonths, fmtDate, fmtMonth, monthStart, todayBangkok } from "@/lib/dates";
 import { n2 } from "@/lib/fin";
 import { markPaid, markRoundChecked, refreshRound } from "../actions";
@@ -33,7 +33,7 @@ const STATUS: Record<string, [string, string]> = {
 
 export default async function PayoutsPage({ searchParams }: { searchParams: Promise<{ m?: string; ok?: string; err?: string }> }) {
   const { supabase: sb, me } = await getMe();
-  if (me.role !== "admin") redirect("/dashboard");
+  if (!seesAll(me)) redirect("/dashboard");
   const sp = await searchParams;
   const today = todayBangkok();
 

@@ -21,3 +21,6 @@ body {
 @media print {
   body > div > header, .no-print { display: none !important; }
 }
+
+/* A viewer sees everything but cannot change anything: buttons that only start an edit are hidden. */
+main[data-readonly] [data-edit] { display: none !important; }

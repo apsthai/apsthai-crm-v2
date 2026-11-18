@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { Flash } from "@/components/flash";
-import { getMe } from "@/lib/auth";
+import { getMe, seesAll } from "@/lib/auth";
 import { addDays, addMonths, daysBetween, fmtDate, fmtMonth, monthStart, todayBangkok } from "@/lib/dates";
 import { flatRv, latestRates, RV_SELECT, type RvRaw } from "@/lib/fin-data";
 import { fmtTHB, toTHB } from "@/lib/money";
@@ -10,7 +10,7 @@ import { AddByHand, type CaseOption, CollectTable } from "./collect-table";
 
 export default async function CollectPage({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string }> }) {
   const { supabase: sb, me } = await getMe();
-  if (me.role !== "admin") redirect("/dashboard");
+  if (!seesAll(me)) redirect("/dashboard");
   const sp = await searchParams;
   const today = todayBangkok();
   const m0 = monthStart(today);

@@ -1,5 +1,5 @@
 import { AppShell, Bar, Card, Tile } from "@/components/app-shell";
-import { getMe } from "@/lib/auth";
+import { getMe, seesAll } from "@/lib/auth";
 import { cycleOf, fmtDate, fmtLongDate, fmtMonth, fmtMonthShort, hourBangkok, todayBangkok } from "@/lib/dates";
 import { fmtPoints, fmtTHBShort } from "@/lib/money";
 import { loadAdmin, loadCompany, loadMine, type TaskRow } from "./data";
@@ -10,7 +10,7 @@ export default async function Dashboard() {
   const { supabase, me } = await getMe();
   const today = todayBangkok();
   const cycle = cycleOf(today);
-  const isAdmin = me.role === "admin";
+  const isAdmin = seesAll(me);
   const [mine, company, admin, fd] = await Promise.all([
     loadMine(supabase, me.id, today, cycle),
     loadCompany(supabase, cycle),

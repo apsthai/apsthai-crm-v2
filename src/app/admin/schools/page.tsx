@@ -1,13 +1,13 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { Flash } from "@/components/flash";
-import { getMe } from "@/lib/auth";
+import { getMe, seesAll } from "@/lib/auth";
 import { AdminHeader } from "../tabs";
 import { SchoolsTable, type SchoolRow } from "./schools-table";
 
 export default async function SchoolsPage({ searchParams }: { searchParams: Promise<{ open?: string; ok?: string; err?: string }> }) {
   const { supabase: sb, me } = await getMe();
-  if (me.role !== "admin") redirect("/dashboard");
+  if (!seesAll(me)) redirect("/dashboard");
   const sp = await searchParams;
   const [schoolsRes, catsRes, stagesRes, appsRes, eduRes, payersRes] = await Promise.all([
     sb.from("schools").select(`id, name, country, type, default_currency, notes, active,

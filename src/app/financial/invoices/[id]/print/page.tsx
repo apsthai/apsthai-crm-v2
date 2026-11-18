@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getMe } from "@/lib/auth";
+import { getMe, seesAll } from "@/lib/auth";
 import { fmtDate } from "@/lib/dates";
 import { n2, thaiDate, thaiTotals } from "@/lib/fin";
 import { PrintButton } from "./print-button";
@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function PrintInvoice({ params }: { params: Promise<{ id: string }> }) {
   const { supabase: sb, me } = await getMe();
-  if (me.role !== "admin") redirect("/dashboard");
+  if (!seesAll(me)) redirect("/dashboard");
   const { id } = await params;
   const [{ data: inv }, { data: co }] = await Promise.all([
     sb.from("invoices").select("id, invoice_no, date, status, currency, total, bill_to_name, bill_to_address, bill_to_country, bill_to_tax_id, thai_vat, wht_pct, invoice_lines(description, amount, created_at)").eq("id", id).maybeSingle(),

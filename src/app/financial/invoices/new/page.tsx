@@ -8,7 +8,7 @@ import { InvoiceForm } from "./invoice-form";
 
 export default async function NewInvoicePage({ searchParams }: { searchParams: Promise<{ r?: string }> }) {
   const { supabase: sb, me } = await getMe();
-  if (me.role !== "admin") redirect("/dashboard");
+  if (me.role !== "admin") redirect(me.role === "viewer" ? "/financial/invoices" : "/dashboard");
   const ids = ((await searchParams).r ?? "").split(",").filter(Boolean);
 
   const [rvRes, draftRes, payersRes] = await Promise.all([

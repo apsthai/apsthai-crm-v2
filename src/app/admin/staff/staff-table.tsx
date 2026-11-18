@@ -55,6 +55,7 @@ export function StaffTable({ rows, cycle, cycles, meId }: { rows: StaffRow[]; cy
                   <td className="border-b border-slate-100 px-4 py-2.5">
                     <span className="font-medium text-slate-900">{r.codename}</span>
                     {r.role === "admin" && <span className="ml-1.5 rounded-full bg-navy-50 px-2 py-0.5 text-[11px] font-semibold text-navy">Admin</span>}
+                    {r.role === "viewer" && <span className="ml-1.5 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">Viewer</span>}
                     <div className="text-xs text-slate-500">{[r.firstname, r.lastname].filter(Boolean).join(" ")} · <span className="font-mono">{r.username}</span></div>
                   </td>
                   <td className="border-b border-slate-100 px-4 py-2.5">{r.org}</td>
@@ -90,6 +91,11 @@ export function StaffTable({ rows, cycle, cycles, meId }: { rows: StaffRow[]; cy
                           <Field label="Handles cases">
                             <select name="handles_cases" defaultValue={r.handles_cases ? "yes" : "no"} className={inputCls}>
                               <option value="yes">Yes</option><option value="no">No</option>
+                            </select>
+                          </Field>
+                          <Field label="Access">
+                            <select name="role" defaultValue={r.role} disabled={r.id === meId} className={inputCls}>
+                              <option value="staff">Staff</option><option value="viewer">Viewer (view only)</option><option value="admin">Admin</option>
                             </select>
                           </Field>
                           <div className="flex gap-2 sm:col-span-3">
@@ -141,6 +147,11 @@ export function AddStaff({ cycle }: { cycle: string }) {
         </Field>
         <Field label="Handles cases">
           <select name="handles_cases" defaultValue="yes" className={inputCls}><option value="yes">Yes</option><option value="no">No</option></select>
+        </Field>
+        <Field label="Access">
+          <select name="role" defaultValue="staff" className={inputCls}>
+            <option value="staff">Staff</option><option value="viewer">Viewer (view only)</option><option value="admin">Admin</option>
+          </select>
         </Field>
         <Field label={`KPI points ${cycleLabel(cycle)} (blank = none)`}><input name="kpi" inputMode="decimal" className={inputCls} /></Field>
         <div className="flex justify-end sm:col-span-4"><Submit>Add staff</Submit></div>

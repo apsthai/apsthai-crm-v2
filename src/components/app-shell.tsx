@@ -1,12 +1,14 @@
 import Image from "next/image";
 import Link from "next/link";
 
-import { getMe } from "@/lib/auth";
+import { getMe, isViewer, seesAll } from "@/lib/auth";
+import { ReadOnlyGuard } from "./read-only-guard";
 
 // The header loads who is signed in itself (cached per request), and shows Approvals with a count to admin only.
 export async function AppShell({ active, children }: { name?: string; active: string; children: React.ReactNode }) {
   const { supabase, me } = await getMe();
-  const isAdmin = me.role === "admin";
+  const isAdmin = seesAll(me);
+  const viewer = isViewer(me);
   const { count } = isAdmin
     ? await supabase.from("stage_updates").select("id", { count: "exact", head: true }).eq("approval", "pending")
     : { count: 0 };
@@ -34,6 +36,7 @@ export async function AppShell({ active, children }: { name?: string; active: st
             ))}
           </nav>
           <div className="flex items-center gap-3 text-sm text-slate-600">
+            {viewer && <span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800" title="You can see everything but cannot change anything">View only</span>}
             <Link href="/account" className="hover:text-navy hover:underline" title="My account · change password">{me.codename}</Link>
             <form action="/auth/signout" method="post">
               <button className="rounded-lg border border-slate-300 px-3 py-1.5 text-[13px] hover:border-navy hover:text-navy">Sign out</button>
@@ -41,7 +44,8 @@ export async function AppShell({ active, children }: { name?: string; active: st
           </div>
         </div>
       </header>
-      <main className="mx-auto flex max-w-6xl flex-col gap-6 px-4 pt-7 pb-12 sm:px-6">{children}</main>
+      <main id="main" data-readonly={viewer ? "" : undefined} className="mx-auto flex max-w-6xl flex-col gap-6 px-4 pt-7 pb-12 sm:px-6">{children}</main>
+      {viewer && <ReadOnlyGuard />}
     </div>
   );
 }

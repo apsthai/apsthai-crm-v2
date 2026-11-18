@@ -4,13 +4,13 @@ import { AppShell } from "@/components/app-shell";
 import { Field, inputCls } from "@/components/fields";
 import { Flash } from "@/components/flash";
 import { Submit } from "@/components/submit";
-import { getMe } from "@/lib/auth";
+import { getMe, seesAll } from "@/lib/auth";
 import { saveSettings } from "../actions";
 import { FinHeader } from "../tabs";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string }> }) {
   const { supabase: sb, me } = await getMe();
-  if (me.role !== "admin") redirect("/dashboard");
+  if (!seesAll(me)) redirect("/dashboard");
   const sp = await searchParams;
   const { data } = await sb.from("company_settings").select("*").eq("single", true).maybeSingle();
   const c = (data ?? {}) as Record<string, string | null>;

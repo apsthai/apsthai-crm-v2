@@ -6,7 +6,7 @@ import { Flash } from "@/components/flash";
 import { Submit } from "@/components/submit";
 import { DatePick, MonthPick } from "@/components/date-pick";
 import { UndoButton } from "@/components/undo-success";
-import { getMe } from "@/lib/auth";
+import { getMe, isViewer, seesAll } from "@/lib/auth";
 import { addDays, daysBetween, fmtDate, fmtMonth, todayBangkok } from "@/lib/dates";
 import { fmtTHB } from "@/lib/money";
 import { addFeedback, updateApplication, addStaff, addTask, closeLost, endStaff, reopenCase, setResult, toggleTask, updateCase, updateStudent, deleteCase, updateTask, deleteTask } from "./actions";
@@ -102,7 +102,8 @@ export default async function CasePage({ params, searchParams }: {
   const everOnCase = linkRows.some((l) => l.staff_id === me.id);
   const open = ["not_started", "in_progress"].includes(kase.overall_status);
   const canEdit = isAdmin || (open && onCase); // admin can also fix closed cases
-  const canMoney = isAdmin || everOnCase;
+  const viewer = isViewer(me);
+  const canMoney = seesAll(me) || everOnCase;
   const myTeams = new Set((teams.data ?? []).map((t) => t.team_id as string));
 
   type Stage = { id: string; name_en: string; level: string; milestone: string; editable_by_team_id: string | null };
@@ -431,8 +432,9 @@ export default async function CasePage({ params, searchParams }: {
           <Card title="Case details">
             {[
               ["Service", kase.category.name_en], ["Intake", fmtMonth(kase.intake)],
-              ["Client", kase.applicant === "student" ? "Student" : `${APPLICANTS.find((x) => x[0] === kase.applicant)?.[1]}${kase.applicant_name ? ` (${kase.applicant_name})` : ""}`],
-              ["Lead source", kase.lead?.name_en ?? "-"], ["Referred by", kase.referred_by ?? "-"],
+              // A viewer does not see who the parent is or who referred the family (contact details).
+              ["Client", kase.applicant === "student" ? "Student" : `${APPLICANTS.find((x) => x[0] === kase.applicant)?.[1]}${kase.applicant_name && !viewer ? ` (${kase.applicant_name})` : ""}`],
+              ["Lead source", kase.lead?.name_en ?? "-"], ["Referred by", viewer ? (kase.referred_by ? "Hidden" : "-") : kase.referred_by ?? "-"],
               ["Sub-agent", kase.sub_agent ? `${kase.sub_agent.name} · ${kase.sub_agent_pct ?? 0}%` : "-"],
               // Services without per-school stages show their one provider here instead of a "Schools" card.
               ...(single ? [["Provider", appName(single)], ["Programme", single.programme ?? "-"]] : []),

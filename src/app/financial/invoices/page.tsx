@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { Flash } from "@/components/flash";
-import { getMe } from "@/lib/auth";
+import { getMe, seesAll } from "@/lib/auth";
 import { daysBetween, fmtDate, todayBangkok } from "@/lib/dates";
 import { money, STATUS_LOOK } from "@/lib/fin";
 import { FinHeader } from "../tabs";
@@ -16,7 +16,7 @@ const TABS = [
 
 export default async function InvoicesPage({ searchParams }: { searchParams: Promise<{ tab?: string; ok?: string; err?: string }> }) {
   const { supabase: sb, me } = await getMe();
-  if (me.role !== "admin") redirect("/dashboard");
+  if (!seesAll(me)) redirect("/dashboard");
   const sp = await searchParams;
   const tab = TABS.find((t) => t[0] === sp.tab) ?? TABS[0];
   const today = todayBangkok();

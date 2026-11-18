@@ -101,7 +101,7 @@ export function RulesTable({ rules, categories, teams, stages, thisYear }:
 }
 
 function NewBtn({ open, onClick }: { open: boolean; onClick: () => void }) {
-  return <button type="button" onClick={onClick} aria-expanded={open}
+  return <button type="button" data-edit onClick={onClick} aria-expanded={open}
     className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-[13px] text-navy hover:border-navy">{open ? "Close" : "New rate"}</button>;
 }
 

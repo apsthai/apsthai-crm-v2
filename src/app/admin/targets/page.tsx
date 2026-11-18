@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { Flash } from "@/components/flash";
 import { Submit } from "@/components/submit";
-import { getMe } from "@/lib/auth";
+import { getMe, seesAll } from "@/lib/auth";
 import { cycleOf, todayBangkok } from "@/lib/dates";
 import { fmtTHB } from "@/lib/money";
 import { AdminHeader } from "../tabs";
@@ -11,7 +11,7 @@ import { saveTargets } from "./actions";
 // Targets for the Flight Deck: money in for the company, and successful cases per service, per cycle (Sep to Aug).
 export default async function TargetsPage({ searchParams }: { searchParams: Promise<{ cycle?: string; ok?: string; err?: string }> }) {
   const { supabase: sb, me } = await getMe();
-  if (me.role !== "admin") redirect("/dashboard");
+  if (!seesAll(me)) redirect("/dashboard");
   const sp = await searchParams;
   const current = cycleOf(todayBangkok()).start;
   const cycle = /^\d{4}$/.test(sp.cycle ?? "") ? `${sp.cycle}-09-01` : current;

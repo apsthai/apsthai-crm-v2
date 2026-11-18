@@ -12,7 +12,7 @@ export function DeleteButton({ action, fields = {}, label = "Delete", question, 
   const [sure, setSure] = useState(false);
   const btn = small ? "px-2 py-1 text-xs" : "px-3 py-1.5 text-[13px]";
   if (!sure) return (
-    <button type="button" onClick={() => setSure(true)} className={`rounded-lg border border-red-300 bg-white text-brand-red hover:bg-red-50 ${btn}`}>{label}</button>
+    <button type="button" data-edit onClick={() => setSure(true)} className={`rounded-lg border border-red-300 bg-white text-brand-red hover:bg-red-50 ${btn}`}>{label}</button>
   );
   const body = (
     <span className="inline-flex flex-wrap items-center gap-2 text-[13px] text-slate-600">

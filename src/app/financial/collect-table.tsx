@@ -123,7 +123,7 @@ export function CollectTable({ rows, addByHand, today, inAWeek }:
         <span className="text-sm text-slate-600">
           {chosen.length ? <><b>{chosen.length} {chosen.length === 1 ? "student" : "students"}</b> picked · {pickedCur} {n2(total)}</> : "Tick students to bill"}
         </span>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap gap-2" data-edit>
           {addByHand}
           {chosen.length > 0 ? (
             <Link href={`/financial/invoices/new?r=${picked.join(",")}`}
@@ -187,7 +187,7 @@ function EditPanel({ row, inAWeek, onClose }: { row: Row; inAWeek: string; onClo
       <div className="flex flex-[1_1_200px] flex-col gap-2 border-slate-200 text-sm sm:border-l sm:pl-6">
         <span className="font-medium text-slate-700">{row.canDelete ? "Added by mistake?" : "Not going to bill this?"}</span>
         {!sure ? (
-          <button type="button" onClick={() => setSure(true)}
+          <button type="button" data-edit onClick={() => setSure(true)}
             className="self-start rounded-lg border border-red-300 px-3 py-1.5 text-[13px] text-brand-red hover:bg-red-50">
             {row.canDelete ? "Delete this amount" : "Not collecting"}
           </button>
@@ -248,7 +248,7 @@ function CasePicker({ cases }: { cases: CaseOption[] }) {
 export function AddByHand({ cases, fixedCase, inAWeek, backTo, label = "+ Add an amount by hand", up = false }:
   { cases?: CaseOption[]; fixedCase?: string; inAWeek: string; backTo?: string; label?: string; up?: boolean }) {
   return (
-    <details className="relative">
+    <details className="relative" data-edit>
       <summary className="cursor-pointer list-none rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm text-navy hover:border-navy">
         {label}
       </summary>

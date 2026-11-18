@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
-import { getMe } from "@/lib/auth";
+import { getMe, seesAll } from "@/lib/auth";
 import { addMonths, fmtDate, fmtMonth } from "@/lib/dates";
 import { n2 } from "@/lib/fin";
 import { PrintButton } from "../../invoices/[id]/print/print-button";
@@ -20,7 +20,7 @@ type Line = {
 
 async function load(id: string) {
   const { supabase: sb, me } = await getMe();
-  if (me.role !== "admin") redirect("/dashboard");
+  if (!seesAll(me)) redirect("/dashboard");
   const { data } = await sb.from("payouts")
     .select(`id, recipient_type, pay_date, status, total, paid_date, paid_amount, note,
       staff:staff!payouts_staff_id_fkey(codename, firstname, lastname), partner:partners(name),

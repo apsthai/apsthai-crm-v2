@@ -32,6 +32,14 @@ The database in Supabase was kept and is the source of truth.
 - "Today" is Asia/Bangkok: `today_bangkok()` in SQL.
 - Students are often under 18 (PDPA). Never commit real data or exports, never log personal data.
 
+## Roles
+- `staff`: own cases. `admin`: everything. `viewer` (owner-approved 18 Nov 2026, for the advisor): sees every page admin sees,
+  changes nothing, never sees contact details. In the database a restrictive policy on every table refuses any insert,
+  update or delete by a viewer, and contacts are closed to viewers. In the app, `seesAll(me)` opens a page to admin and
+  viewer, actions stay admin-only, and `ReadOnlyGuard` disables every saving form for a viewer; mark buttons that only
+  start an edit with `data-edit` so they are hidden. A new table gets the viewer policies by repeating the loop in
+  migration crm_v2_viewer_role.
+
 ## Advisor connector (owner-approved 17 Nov 2026)
 - `/api/mcp/[token]` is a read-only MCP connector for the organisation's advisor (Bee7). It checks `ADVISOR_MCP_TOKEN`
   and connects to Postgres as `advisor_ro` via `ADVISOR_DATABASE_URL` (the `pg` library), never with Supabase keys.

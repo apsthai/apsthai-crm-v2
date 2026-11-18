@@ -1,12 +1,14 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
-import { getMe } from "@/lib/auth";
+import { getMe, isViewer } from "@/lib/auth";
 import { fmtMonth, todayBangkok } from "@/lib/dates";
 import { educationLookups } from "@/lib/education";
 import { NewCaseForm, type StudentOption } from "./new-case-form";
 
 export default async function NewCasePage() {
   const { supabase: sb, me } = await getMe();
+  if (isViewer(me)) redirect("/cases");
   const [students, cats, channels, staff, edu] = await Promise.all([
     sb.from("students").select("id, codename, nickname, firstname, lastname, cases(id, intake, overall_status, category_id, category:categories(name_en))")
       .is("merged_into", null).is("anonymized_at", null).order("codename"),

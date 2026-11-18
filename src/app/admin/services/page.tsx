@@ -1,13 +1,13 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { Flash } from "@/components/flash";
-import { getMe } from "@/lib/auth";
+import { getMe, seesAll } from "@/lib/auth";
 import { AdminHeader } from "../tabs";
 import { AddService, ServicesTable, type ServiceRow } from "./services-table";
 
 export default async function ServicesPage({ searchParams }: { searchParams: Promise<{ open?: string; ok?: string; err?: string }> }) {
   const { supabase: sb, me } = await getMe();
-  if (me.role !== "admin") redirect("/dashboard");
+  if (!seesAll(me)) redirect("/dashboard");
   const sp = await searchParams;
   const [catsRes, casesRes, teamsRes, upRes, termRes, ruleRes] = await Promise.all([
     sb.from("categories").select(`id, name_en, name_th, points, estimated_value_thb, in_house, sort_order, active,

@@ -21,3 +21,7 @@ export const getMe = cache(async () => {
   if (!me?.active) redirect("/auth/signout?msg=inactive");
   return { supabase, me: me as Me };
 });
+
+// Admin and viewer see every page; only admin changes things there. A viewer (the organisation's advisor) changes nothing.
+export const seesAll = (me: Me) => me.role === "admin" || me.role === "viewer";
+export const isViewer = (me: Me) => me.role === "viewer";

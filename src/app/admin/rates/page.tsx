@@ -3,7 +3,7 @@ import { AppShell } from "@/components/app-shell";
 import { DatePick } from "@/components/date-pick";
 import { Flash } from "@/components/flash";
 import { Submit } from "@/components/submit";
-import { getMe } from "@/lib/auth";
+import { getMe, seesAll } from "@/lib/auth";
 import { fmtDate, todayBangkok } from "@/lib/dates";
 import { AdminHeader } from "../tabs";
 import { DeleteButton } from "@/components/delete-button";
@@ -11,7 +11,7 @@ import { deleteRate, saveRates } from "./actions";
 
 export default async function RatesPage({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string }> }) {
   const { supabase: sb, me } = await getMe();
-  if (me.role !== "admin") redirect("/dashboard");
+  if (!seesAll(me)) redirect("/dashboard");
   const sp = await searchParams;
   const [{ data }, ...usedRes] = await Promise.all([
     sb.from("exchange_rates").select("currency, rate_thb, as_of").order("as_of", { ascending: false }),

@@ -4,7 +4,7 @@ import { AppShell, Card } from "@/components/app-shell";
 import { inputCls } from "@/components/fields";
 import { Flash } from "@/components/flash";
 import { Submit } from "@/components/submit";
-import { getMe } from "@/lib/auth";
+import { getMe, seesAll } from "@/lib/auth";
 import { addDays, fmtDate, fmtMonth, todayBangkok } from "@/lib/dates";
 import { UndoButton } from "@/components/undo-success";
 import { approve, reject } from "./actions";
@@ -20,7 +20,7 @@ const SELECT = "id, date, created_by, approved_by, approved_at, case_id, applica
 export default async function ApprovalsPage({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string }> }) {
   const sp = await searchParams;
   const { supabase: sb, me } = await getMe();
-  if (me.role !== "admin") redirect("/dashboard");
+  if (!seesAll(me)) redirect("/dashboard");
 
   const since = addDays(todayBangkok(), -30);
   const [pending, recent, staff] = await Promise.all([

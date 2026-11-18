@@ -1,14 +1,14 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { Flash } from "@/components/flash";
-import { getMe } from "@/lib/auth";
+import { getMe, seesAll } from "@/lib/auth";
 import { todayBangkok } from "@/lib/dates";
 import { AdminHeader } from "../tabs";
 import { RulesTable, type RuleRow } from "./rules-table";
 
 export default async function RulesPage({ searchParams }: { searchParams: Promise<{ ok?: string; err?: string }> }) {
   const { supabase: sb, me } = await getMe();
-  if (me.role !== "admin") redirect("/dashboard");
+  if (!seesAll(me)) redirect("/dashboard");
   const sp = await searchParams;
   const [rulesRes, catsRes, teamsRes, stagesRes, casesRes] = await Promise.all([
     sb.from("payout_rules").select("id, category_id, revenue_type, method, value, recipient, team_id, count_when, count_stage_id, cycle, effective_intake")

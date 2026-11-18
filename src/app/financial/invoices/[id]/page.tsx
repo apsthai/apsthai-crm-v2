@@ -3,7 +3,7 @@ import { notFound, redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { Flash } from "@/components/flash";
 import { Submit } from "@/components/submit";
-import { getMe } from "@/lib/auth";
+import { getMe, seesAll } from "@/lib/auth";
 import { fmtDate, todayBangkok } from "@/lib/dates";
 import { money, n2, round2, STATUS_LOOK, thaiTotals } from "@/lib/fin";
 import { flatRv, RV_SELECT, teamRules, type RvRaw } from "@/lib/fin-data";
@@ -13,7 +13,7 @@ import { MoneyIn } from "./money-in";
 export default async function InvoicePage({ params, searchParams }:
   { params: Promise<{ id: string }>; searchParams: Promise<{ ok?: string; err?: string }> }) {
   const { supabase: sb, me } = await getMe();
-  if (me.role !== "admin") redirect("/dashboard");
+  if (!seesAll(me)) redirect("/dashboard");
   const { id } = await params;
   const sp = await searchParams;
 

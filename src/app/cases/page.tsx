@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { inputCls } from "@/components/fields";
-import { getMe } from "@/lib/auth";
+import { getMe, seesAll } from "@/lib/auth";
 import { daysBetween, fmtDate, fmtMonth, todayBangkok } from "@/lib/dates";
 
 type Params = { scope?: string; status?: string; service?: string; intake?: string; q?: string; sort?: string; dir?: string; deleted?: string };
@@ -14,7 +14,7 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
   const { supabase: sb, me } = await getMe();
   const today = todayBangkok();
   // Admin looks after the whole company, so their list opens on All cases; staff open on My cases.
-  const scope = sp.scope === "all" || sp.scope === "mine" ? sp.scope : me.role === "admin" ? "all" : "mine";
+  const scope = sp.scope === "all" || sp.scope === "mine" ? sp.scope : seesAll(me) ? "all" : "mine";
   const status = sp.status && STATUS[sp.status] ? sp.status : "active";
 
   const [casesRes, catsRes, mineRes] = await Promise.all([
@@ -78,7 +78,7 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
     <AppShell name={me.codename} active="/cases">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold text-slate-900">Cases</h1>
-        <Link href="/cases/new" className="rounded-lg bg-navy px-4 py-2 text-sm font-medium text-white hover:bg-navy-dark">+ New case</Link>
+        <Link href="/cases/new" data-edit className="rounded-lg bg-navy px-4 py-2 text-sm font-medium text-white hover:bg-navy-dark">+ New case</Link>
       </div>
       {sp.deleted && <p role="status" className="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">Case deleted.</p>}
 
