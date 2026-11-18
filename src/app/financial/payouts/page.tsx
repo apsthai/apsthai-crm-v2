@@ -140,7 +140,11 @@ function Group({ title, sub, total, payouts, period, kind }:
                 const st = STATUS[p.status];
                 return [
                   <tr key={p.id} className="bg-slate-50">
-                    <td className="border-b border-slate-100 px-4 py-2.5 font-semibold">{who}</td>
+                    <td className="border-b border-slate-100 px-4 py-2.5 font-semibold">
+                      {who}
+                      {/* A one-page summary to save as PDF and send to this person or partner. */}
+                      <Link href={`/financial/payouts/${p.id}`} className="no-print ml-2 rounded-md border border-slate-300 bg-white px-2 py-0.5 text-xs font-normal text-navy hover:border-navy">Summary PDF</Link>
+                    </td>
                     <td className="border-b border-slate-100 px-4 py-2.5 text-slate-500">{p.lines.length} {p.lines.length === 1 ? "line" : "lines"}</td>
                     <td className="border-b border-slate-100" /><td className="border-b border-slate-100" />
                     <td className="border-b border-slate-100 px-4 py-2.5 text-right font-semibold">฿{n2(Number(p.total))}</td>
