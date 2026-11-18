@@ -21,8 +21,9 @@ const STATUSES = [
   ["in_progress", "In progress"], ["completed", "Completed"], ["skipped", "Skipped"], ["failed", "Failed"], ["not_started", "Not started"],
 ];
 
-export function StageChip({ caseId, applicationId, stageId, name, state, note, success, canEdit, big, today }: {
+export function StageChip({ caseId, applicationId, stageId, name, state, note, current, success, canEdit, big, today }: {
   caseId: string; applicationId?: string | null; stageId: string; name: string; state: ChipState; note?: string;
+  current?: { status: string; date: string; remark: string | null };
   success: boolean; canEdit: boolean; big?: boolean; today: string;
 }) {
   const [open, setOpen] = useState(false);
@@ -53,7 +54,7 @@ export function StageChip({ caseId, applicationId, stageId, name, state, note, s
           if (r) setAlignRight(r.left + 288 > window.innerWidth - 16);
           setOpen(!open);
         }}
-        title={`${name}: ${look.label}`} className={`${cls} ${canEdit ? "cursor-pointer hover:brightness-95" : "cursor-default"}`}>
+        title={`${name}: ${note ?? look.label}`} className={`${cls} ${canEdit ? "cursor-pointer hover:brightness-95" : "cursor-default"}`}>
         {big ? (<><span className="text-sm font-semibold">{label}</span><span className="text-xs opacity-85">{note ?? look.label}</span></>) : label}
       </button>
       {open && (
@@ -64,15 +65,16 @@ export function StageChip({ caseId, applicationId, stageId, name, state, note, s
           <div className="text-sm font-semibold">{name}</div>
           {success && <p className="text-xs text-amber-800">Completing this stage sends the case to Admin for approval.</p>}
           <label className="flex flex-col gap-1 text-[13px] font-medium text-slate-600">Status
-            <select name="status" defaultValue={state === "done" ? "completed" : state === "now" ? "completed" : "in_progress"} className={inputCls}>
+            {/* Opens with what is saved now, so a second look shows exactly what was entered. */}
+            <select name="status" defaultValue={current?.status ?? "in_progress"} className={inputCls}>
               {STATUSES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
             </select>
           </label>
           <div className="flex flex-col gap-1 text-[13px] font-medium text-slate-600">Date
-            <DatePick name="date" defaultValue={today} />
+            <DatePick name="date" defaultValue={current?.date ?? today} />
           </div>
           <label className="flex flex-col gap-1 text-[13px] font-medium text-slate-600">Note
-            <input name="remark" placeholder="Optional" className={inputCls} />
+            <input name="remark" placeholder="Optional" defaultValue={current?.remark ?? ""} className={inputCls} />
           </label>
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setOpen(false)} className="rounded-lg px-3 py-2 text-sm text-slate-600 hover:bg-slate-50">Cancel</button>

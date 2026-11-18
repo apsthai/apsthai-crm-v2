@@ -51,7 +51,7 @@ export default async function CasePage({ params, searchParams }: {
   const [links, stages, latest, apps, tasks, prog, weighted, staff, teams, products, channels, partners, stageLog, otherCases, edu, contacts, eduLook] = await Promise.all([
     sb.from("case_staff").select("id, staff_id, start_date, end_date, created_at").eq("case_id", id).order("start_date").order("created_at"),
     sb.from("stages").select("id, name_en, sort_order, level, milestone, editable_by_team_id").eq("category_id", kase.category_id).eq("active", true).order("sort_order"),
-    sb.from("v_stage_latest").select("application_id, stage_id, status, date, approval").eq("case_id", id),
+    sb.from("v_stage_latest").select("application_id, stage_id, status, date, remark, approval").eq("case_id", id),
     sb.from("applications").select("id, programme, commissionable_fee, currency, expected_income, result, created_at, created_by, product:products(school:schools(name, type), partner:partners(name))").eq("case_id", id).order("created_at"),
     sb.from("tasks").select("id, title, due_date, assigned_to, done_at, done_by, created_at, created_by").eq("case_id", id).order("due_date"),
     sb.from("v_case_progress").select("probability_pct").eq("case_id", id).maybeSingle(),
@@ -110,15 +110,19 @@ export default async function CasePage({ params, searchParams }: {
   const caseStages = stageRows.filter((st) => st.level === "case");
   const appStages = stageRows.filter((st) => st.level === "application");
   const last = new Map((latest.data ?? []).map((l) => [`${l.application_id ?? ""}|${l.stage_id}`, l]));
-  const stateOf = (appId: string | null, stageId: string): { state: ChipState; note?: string } => {
+  // The chip's look, the line under it, and what the edit box opens with (the latest update of that stage).
+  type StageNow = { state: ChipState; note?: string; current?: { status: string; date: string; remark: string | null } };
+  const stateOf = (appId: string | null, stageId: string): StageNow => {
     const l = last.get(`${appId ?? ""}|${stageId}`);
     if (!l) return { state: "todo" };
-    if (l.status === "completed" && l.approval === "pending") return { state: "pending", note: `Waiting for approval · ${fmtDate(l.date)}` };
-    if (l.status === "completed") return { state: "done", note: `Done ${fmtDate(l.date)}` };
-    if (l.status === "in_progress") return { state: "now", note: `In progress since ${fmtDate(l.date)}` };
-    if (l.status === "skipped") return { state: "skip", note: "Skipped" };
-    if (l.status === "failed") return { state: "fail", note: `Failed ${fmtDate(l.date)}` };
-    return { state: "todo" };
+    const current = { status: l.status as string, date: l.date as string, remark: (l.remark as string | null) ?? null };
+    const withNote = (s: string) => (current.remark ? `${s} · ${current.remark}` : s);
+    if (l.status === "completed" && l.approval === "pending") return { state: "pending", note: withNote(`Waiting for approval · ${fmtDate(l.date)}`), current };
+    if (l.status === "completed") return { state: "done", note: withNote(`Done ${fmtDate(l.date)}`), current };
+    if (l.status === "in_progress") return { state: "now", note: withNote(`In progress since ${fmtDate(l.date)}`), current };
+    if (l.status === "skipped") return { state: "skip", note: withNote("Skipped"), current };
+    if (l.status === "failed") return { state: "fail", note: withNote(`Failed ${fmtDate(l.date)}`), current };
+    return { state: "todo", current };
   };
   const canStage = (st: Stage) => open && (canEdit || (st.editable_by_team_id !== null && myTeams.has(st.editable_by_team_id)));
 
@@ -254,7 +258,7 @@ export default async function CasePage({ params, searchParams }: {
               <div className="flex flex-wrap gap-2">
                 {caseStages.map((st) => {
                   const s = stateOf(null, st.id);
-                  return <StageChip key={st.id} big caseId={id} stageId={st.id} name={st.name_en} state={s.state} note={s.note}
+                  return <StageChip key={st.id} big caseId={id} stageId={st.id} name={st.name_en} state={s.state} note={s.note} current={s.current}
                     success={st.milestone === "success"} canEdit={canStage(st)} today={today} />;
                 })}
               </div>
@@ -293,9 +297,15 @@ export default async function CasePage({ params, searchParams }: {
                         {appStages.map((st) => {
                           const s = stateOf(a.id, st.id);
                           return <StageChip key={st.id} caseId={id} applicationId={a.id} stageId={st.id} name={st.name_en} state={s.state}
-                            success={st.milestone === "success"} canEdit={canStage(st) && !dim} today={today} />;
+                            note={s.note} current={s.current} success={st.milestone === "success"} canEdit={canStage(st) && !dim} today={today} />;
                         })}
                       </div>
+                      {/* Notes of the stages still open (in progress, waiting or failed), so they show without opening the history. */}
+                      {appStages.map((st) => ({ st, s: stateOf(a.id, st.id) }))
+                        .filter(({ s }) => s.current?.remark && ["now", "pending", "fail"].includes(s.state))
+                        .map(({ st, s }) => (
+                          <p key={st.id} className="mt-1.5 text-[13px] text-slate-600"><b className="font-medium">{st.name_en}:</b> {s.current!.remark} <span className="text-slate-400">· {fmtDate(s.current!.date)}</span></p>
+                        ))}
                       {canEdit && (
                         <details className="mt-2 text-[13px]">
                           <summary className="cursor-pointer text-navy">Edit programme and fee</summary>
