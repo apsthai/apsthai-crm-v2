@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { getMe } from "@/lib/auth";
 import { saveCurrentEducation } from "@/lib/education";
 import { todayBangkok } from "@/lib/dates";
+import { pdpaLocation } from "@/lib/pdpa";
 
 const s = (fd: FormData, k: string) => {
   const v = String(fd.get(k) ?? "").trim();
@@ -202,5 +203,18 @@ export async function deleteTask(fd: FormData) {
   const { supabase } = await getMe();
   const caseId = s(fd, "case_id")!;
   const r = await supabase.from("tasks").delete().eq("id", s(fd, "task_id")!).select("id");
+  back(caseId, changed(r));
+}
+
+// PDPA consent on the student. RLS lets the case's staff and admin change it; a viewer cannot.
+export async function savePdpa(fd: FormData) {
+  const { supabase } = await getMe();
+  const caseId = s(fd, "case_id")!;
+  const by = s(fd, "pdpa_by");
+  if (!by) return back(caseId, "Choose who gave the consent");
+  const r = await supabase.from("students").update({
+    pdpa_consent_date: s(fd, "pdpa_date") ?? todayBangkok(), pdpa_consent_by: by,
+    pdpa_consent_location: pdpaLocation(s(fd, "pdpa_how"), s(fd, "pdpa_note")),
+  }).eq("id", s(fd, "student_id")!).select("id");
   back(caseId, changed(r));
 }

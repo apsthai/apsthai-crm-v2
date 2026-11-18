@@ -35,6 +35,7 @@ export default async function NewCasePage() {
         <h1 className="mt-1 text-2xl font-semibold text-slate-900">New case</h1>
       </div>
       <NewCaseForm
+        today={todayBangkok()}
         students={options}
         services={(cats.data ?? []) as { id: string; name_en: string }[]}
         channels={(channels.data ?? []) as { id: string; name_en: string }[]}

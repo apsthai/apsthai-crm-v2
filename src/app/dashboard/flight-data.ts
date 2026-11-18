@@ -32,7 +32,7 @@ export async function loadFlightDeck(sb: SupabaseClient, today: string, cycle: C
   const [cats, targets, cases, pays, invs, recv, rates, pending, progress, flow, staff, links, pts, kpis, tasks, updates] = await Promise.all([
     sb.from("categories").select("id, name_en, sort_order, active").order("sort_order"),
     sb.from("targets").select("category_id, cases, revenue_thb").eq("cycle_start", cycle.start),
-    sb.from("cases").select("id, category_id, intake, overall_status, closed_date, created_at, updated_at"),
+    sb.from("cases").select("id, category_id, intake, overall_status, closed_date, created_at, updated_at, student:students(pdpa_consent_date)"),
     sb.from("payments").select("received_date, received_thb, created_at").gte("received_date", payFrom),
     sb.from("invoices").select("id, date, total, currency, bill_to_name").in("status", ["issued", "partially_paid"]).order("date"),
     sb.from("receivables").select("amount, currency, follow_up_on").eq("status", "expected"),
@@ -54,8 +54,9 @@ export async function loadFlightDeck(sb: SupabaseClient, today: string, cycle: C
   const frac = day / total;
   const rate = new Map((rates.data ?? []).map((r) => [r.currency as string, Number(r.rate_thb)]));
 
-  type C = { id: string; category_id: string; intake: string | null; overall_status: string; closed_date: string | null; created_at: string; updated_at: string };
-  const allCases = (cases.data ?? []) as C[];
+  type C = { id: string; category_id: string; intake: string | null; overall_status: string; closed_date: string | null; created_at: string; updated_at: string;
+    student: { pdpa_consent_date: string | null } | null };
+  const allCases = (cases.data ?? []) as unknown as C[];
   const active = allCases.filter((c) => ACTIVE.includes(c.overall_status));
   const activeIds = new Set(active.map((c) => c.id));
   const won = allCases.filter((c) => c.overall_status === "success" && c.closed_date && c.closed_date >= cycle.start && c.closed_date <= cycle.end);
@@ -163,6 +164,6 @@ export async function loadFlightDeck(sb: SupabaseClient, today: string, cycle: C
     },
     closing,
     team,
-    lights: { approvals: pending.count ?? 0, overdue: overdue.length, noTask: active.filter((c) => !withTask.has(c.id)).length, quiet, stale, billSoon },
+    lights: { noConsent: active.filter((c) => !c.student?.pdpa_consent_date).length, approvals: pending.count ?? 0, overdue: overdue.length, noTask: active.filter((c) => !withTask.has(c.id)).length, quiet, stale, billSoon },
   };
 }

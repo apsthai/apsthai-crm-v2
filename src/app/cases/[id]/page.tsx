@@ -7,9 +7,11 @@ import { Submit } from "@/components/submit";
 import { DatePick, MonthPick } from "@/components/date-pick";
 import { UndoButton } from "@/components/undo-success";
 import { getMe, isViewer, seesAll } from "@/lib/auth";
+import { PdpaFields } from "@/components/pdpa-fields";
+import { pdpaByWord } from "@/lib/pdpa";
 import { addDays, daysBetween, fmtDate, fmtMonth, todayBangkok } from "@/lib/dates";
 import { fmtTHB } from "@/lib/money";
-import { addFeedback, updateApplication, addStaff, addTask, closeLost, endStaff, reopenCase, setResult, toggleTask, updateCase, updateStudent, deleteCase, updateTask, deleteTask } from "./actions";
+import { addFeedback, updateApplication, addStaff, addTask, closeLost, endStaff, reopenCase, setResult, toggleTask, updateCase, updateStudent, deleteCase, updateTask, deleteTask, savePdpa } from "./actions";
 import { AddSchool } from "./add-school";
 import { ResultSelect } from "./result-select";
 import { SubAgentFields } from "./sub-agent-fields";
@@ -39,12 +41,13 @@ export default async function CasePage({ params, searchParams }: {
   const isAdmin = me.role === "admin";
 
   const { data: c, error } = await sb.from("cases")
-    .select("id, intake, applicant, applicant_name, referred_by, sub_agent_pct, sub_agent_id, lead_channel_id, overall_status, overall_remark, closed_date, created_at, created_by, category_id, student:students(id, codename, nickname, firstname, lastname), category:categories(name_en, in_house), lead:lead_channels(name_en), sub_agent:partners(name)")
+    .select("id, intake, applicant, applicant_name, referred_by, sub_agent_pct, sub_agent_id, lead_channel_id, overall_status, overall_remark, closed_date, created_at, created_by, category_id, student:students(id, codename, nickname, firstname, lastname, pdpa_consent_date, pdpa_consent_by, pdpa_consent_location), category:categories(name_en, in_house), lead:lead_channels(name_en), sub_agent:partners(name)")
     .eq("id", id).maybeSingle();
   if (error) throw new Error(error.message);
   if (!c) notFound();
   const kase = c as unknown as typeof c & {
-    student: { id: string; codename: string; nickname: string; firstname: string | null; lastname: string | null }; category: { name_en: string; in_house: boolean };
+    student: { id: string; codename: string; nickname: string; firstname: string | null; lastname: string | null;
+      pdpa_consent_date: string | null; pdpa_consent_by: string | null; pdpa_consent_location: string | null }; category: { name_en: string; in_house: boolean };
     lead: { name_en: string } | null; sub_agent: { name: string } | null;
   };
 
@@ -537,6 +540,24 @@ export default async function CasePage({ params, searchParams }: {
             {kase.student.lastname && <div className="text-[13px] text-slate-500">Last name: {kase.student.lastname}</div>}
             {phone && <div className="mt-1.5 text-[13px] text-slate-500">{RELATION_WORD[phone.relation] ?? phone.relation} · {phone.value}</div>}
             {line && <div className="text-[13px] text-slate-500">{RELATION_WORD[line.relation] ?? line.relation} · LINE {line.value}</div>}
+            {/* PDPA consent: shown to everyone on the case; recorded by the case's staff or admin. */}
+            {kase.student.pdpa_consent_date ? (
+              <div className="mt-2 text-[13px] text-emerald-700">✓ PDPA consent · {fmtDate(kase.student.pdpa_consent_date)} · {pdpaByWord(kase.student.pdpa_consent_by)}
+                {kase.student.pdpa_consent_location ? <span className="text-slate-500"> · {kase.student.pdpa_consent_location}</span> : null}</div>
+            ) : (
+              <div className="mt-2"><span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800">No PDPA consent yet</span></div>
+            )}
+            {canEditStudent && (
+              <details className="mt-2 text-sm">
+                <summary className="cursor-pointer text-navy">{kase.student.pdpa_consent_date ? "Edit PDPA consent" : "Record consent"}</summary>
+                <form action={savePdpa} className="mt-3 flex flex-col gap-2.5">
+                  <input type="hidden" name="case_id" value={id} />
+                  <input type="hidden" name="student_id" value={kase.student.id} />
+                  <PdpaFields today={today} date={kase.student.pdpa_consent_date} by={kase.student.pdpa_consent_by} location={kase.student.pdpa_consent_location} />
+                  <Submit>Save consent</Submit>
+                </form>
+              </details>
+            )}
             {canEditStudent && (
               <details className="mt-2 text-sm">
                 <summary className="cursor-pointer text-navy">Edit student</summary>

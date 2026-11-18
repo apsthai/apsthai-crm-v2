@@ -4,7 +4,7 @@ import { inputCls } from "@/components/fields";
 import { getMe, seesAll } from "@/lib/auth";
 import { daysBetween, fmtDate, fmtMonth, todayBangkok } from "@/lib/dates";
 
-type Params = { scope?: string; status?: string; service?: string; intake?: string; q?: string; sort?: string; dir?: string; deleted?: string };
+type Params = { scope?: string; status?: string; service?: string; intake?: string; q?: string; sort?: string; dir?: string; deleted?: string; consent?: string };
 const STATUS: Record<string, string[]> = {
   active: ["not_started", "in_progress"], success: ["success"], fail: ["fail"],
 };
@@ -18,7 +18,7 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
   const status = sp.status && STATUS[sp.status] ? sp.status : "active";
 
   const [casesRes, catsRes, mineRes] = await Promise.all([
-    sb.from("cases").select("id, intake, overall_status, category_id, student:students(codename), category:categories(name_en), case_staff(end_date, staff:staff!case_staff_staff_id_fkey(codename))"),
+    sb.from("cases").select("id, intake, overall_status, category_id, student:students(codename, pdpa_consent_date), category:categories(name_en), case_staff(end_date, staff:staff!case_staff_staff_id_fkey(codename))"),
     sb.from("categories").select("id, name_en").eq("active", true).order("sort_order"),
     sb.from("case_staff").select("case_id").eq("staff_id", me.id).is("end_date", null),
   ]);
@@ -26,7 +26,7 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
 
   type Row = {
     id: string; intake: string; overall_status: string; category_id: string;
-    student: { codename: string }; category: { name_en: string };
+    student: { codename: string; pdpa_consent_date: string | null }; category: { name_en: string };
     case_staff: { end_date: string | null; staff: { codename: string } }[];
   };
   const mine = new Set((mineRes.data ?? []).map((r) => r.case_id as string));
@@ -39,6 +39,8 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
   if (sp.service) rows = rows.filter((r) => r.category_id === sp.service);
   if (sp.intake) rows = rows.filter((r) => r.intake === sp.intake);
   if (sp.q) { const q = sp.q.toLowerCase(); rows = rows.filter((r) => r.student.codename.toLowerCase().includes(q)); }
+  // From the Flight Deck warning: only students with no PDPA consent yet.
+  if (sp.consent === "no") rows = rows.filter((r) => !r.student.pdpa_consent_date);
 
   const ids = rows.map((r) => r.id);
   const [progRes, taskRes] = ids.length ? await Promise.all([
@@ -81,6 +83,11 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
         <Link href="/cases/new" data-edit className="rounded-lg bg-navy px-4 py-2 text-sm font-medium text-white hover:bg-navy-dark">+ New case</Link>
       </div>
       {sp.deleted && <p role="status" className="rounded-lg bg-emerald-50 px-4 py-3 text-sm text-emerald-800">Case deleted.</p>}
+      {sp.consent === "no" && (
+        <p className="flex flex-wrap items-center gap-2 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Showing only students with no PDPA consent yet (yellow dot). <Link href={link({ consent: undefined })} className="font-medium text-navy hover:underline">Show all</Link>
+        </p>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex gap-1 rounded-lg bg-slate-200 p-1 text-sm">
@@ -140,7 +147,8 @@ export default async function CasesPage({ searchParams }: { searchParams: Promis
               const active = STATUS.active.includes(r.overall_status);
               return (
                 <tr key={r.id} className="hover:bg-slate-50">
-                  <td className="border-b border-slate-100 px-4 py-3"><Link href={`/cases/${r.id}`} className="font-medium text-navy hover:underline">{r.student.codename}</Link></td>
+                  <td className="border-b border-slate-100 px-4 py-3"><Link href={`/cases/${r.id}`} className="font-medium text-navy hover:underline">{r.student.codename}</Link>
+                    {!r.student.pdpa_consent_date && <span title="No PDPA consent yet" aria-label="No PDPA consent yet" className="ml-1.5 inline-block size-2 rounded-full bg-amber-500 align-middle" />}</td>
                   <td className="border-b border-slate-100 px-4 py-3">{r.category.name_en}</td>
                   <td className="border-b border-slate-100 px-4 py-3">{fmtMonth(r.intake)}</td>
                   <td className="border-b border-slate-100 px-4 py-3">{p?.furthest_stage_en ?? "Not started"}</td>

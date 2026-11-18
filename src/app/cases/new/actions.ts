@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { getMe } from "@/lib/auth";
 import { saveCurrentEducation } from "@/lib/education";
+import { pdpaLocation } from "@/lib/pdpa";
 
 export type NewCaseState = { error: string | null };
 
@@ -39,10 +40,18 @@ export async function createCase(_prev: NewCaseState, fd: FormData): Promise<New
   if (error) return { error: error.message };
   // Current school and year, if given, go on the student's record for this academic year.
   let eduErr: string | null = null;
-  if (s(fd, "current_school") || s(fd, "current_level")) {
-    const { data: kase } = await supabase.from("cases").select("student_id").eq("id", data).single();
-    if (kase) eduErr = await saveCurrentEducation(supabase, kase.student_id, s(fd, "current_school"), s(fd, "current_level"));
+  const { data: kase } = await supabase.from("cases").select("student_id").eq("id", data).single();
+  if (kase && (s(fd, "current_school") || s(fd, "current_level"))) {
+    eduErr = await saveCurrentEducation(supabase, kase.student_id, s(fd, "current_school"), s(fd, "current_level"));
+  }
+  // PDPA consent for a new student, if it was given already.
+  if (kase && isNew && s(fd, "pdpa_by")) {
+    const p = await supabase.from("students").update({
+      pdpa_consent_date: s(fd, "pdpa_date"), pdpa_consent_by: s(fd, "pdpa_by"),
+      pdpa_consent_location: pdpaLocation(s(fd, "pdpa_how"), s(fd, "pdpa_note")),
+    }).eq("id", kase.student_id);
+    if (p.error) eduErr = eduErr ?? `PDPA consent: ${p.error.message}`;
   }
   revalidatePath("/", "layout");
-  redirect(`/cases/${data}?${eduErr ? `err=${encodeURIComponent(`Case created, but the school could not be saved: ${eduErr}`)}` : "ok=1"}`);
+  redirect(`/cases/${data}?${eduErr ? `err=${encodeURIComponent(`Case created, but this was not saved: ${eduErr}`)}` : "ok=1"}`);
 }

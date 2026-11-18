@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useState } from "react";
 import { MonthPick } from "@/components/date-pick";
 import { EducationFields } from "@/components/education-fields";
+import { PdpaFields } from "@/components/pdpa-fields";
 import { Field, inputCls } from "@/components/fields";
 import type { LevelOpt } from "@/lib/education";
 import { Submit } from "@/components/submit";
@@ -42,9 +43,9 @@ function StudentLine({ s }: { s: StudentOption }) {
   );
 }
 
-export function NewCaseForm({ students, services, channels, staff, me, thisYear, schoolNames, levels }: {
+export function NewCaseForm({ students, services, channels, staff, me, thisYear, today, schoolNames, levels }: {
   students: StudentOption[]; services: Opt[]; channels: Opt[]; staff: { id: string; codename: string }[];
-  me: { id: string; codename: string; isAdmin: boolean }; thisYear: number; schoolNames: string[]; levels: LevelOpt[];
+  me: { id: string; codename: string; isAdmin: boolean }; thisYear: number; today: string; schoolNames: string[]; levels: LevelOpt[];
 }) {
   const [state, action] = useActionState<NewCaseState, FormData>(createCase, { error: null });
   const [mode, setMode] = useState<"pick" | "new">("pick");
@@ -123,6 +124,9 @@ export function NewCaseForm({ students, services, channels, staff, me, thisYear,
               </Field>
               <Field label="Phone"><input name="phone" value={st.phone} onChange={upd("phone")} className={inputCls} inputMode="tel" /></Field>
               <Field label="LINE ID"><input name="line" value={st.line} onChange={upd("line")} className={inputCls} /></Field>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <PdpaFields today={today} optional />
             </div>
 
             {dups.length > 0 && (
