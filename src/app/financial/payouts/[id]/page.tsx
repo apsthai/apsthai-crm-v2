@@ -14,7 +14,8 @@ type Line = {
   id: string; line_type: string; base_thb: number | null; share: number | null; amount: number; note: string | null; created_at: string;
   rule: One<{ method: string; value: number | null }>;
   kase: One<{ intake: string | null; student: One<{ codename: string }>; category: One<{ name_en: string }> }>;
-  pl: One<{ payment: One<{ received_date: string; invoice: One<{ invoice_no: string | null }> }>; rv: One<{ school: One<{ name: string }> }> }>;
+  pl: One<{ payment: One<{ received_date: string; invoice: One<{ invoice_no: string | null }> }>;
+    rv: One<{ school: One<{ name: string }>; app: One<{ product: One<{ school: One<{ name: string }> }> }> }> }>;
 };
 
 async function load(id: string) {
@@ -25,7 +26,7 @@ async function load(id: string) {
       staff:staff!payouts_staff_id_fkey(codename, firstname, lastname), partner:partners(name),
       lines:payout_lines(id, line_type, base_thb, share, amount, note, created_at, rule:payout_rules(method, value),
         kase:cases(intake, student:students(codename), category:categories(name_en)),
-        pl:payment_lines(payment:payments(received_date, invoice:invoices(invoice_no)), rv:receivables(school:schools(name))))`)
+        pl:payment_lines(payment:payments(received_date, invoice:invoices(invoice_no)), rv:receivables(school:schools(name), app:applications(product:products(school:schools(name))))))`)
     .eq("id", id).maybeSingle();
   return { sb, p: data };
 }
@@ -114,7 +115,9 @@ export default async function PayoutSummary({ params }: { params: Promise<{ id: 
               const k = one(l.kase);
               const pl = one(l.pl);
               const pay = one(pl?.payment ?? null);
-              const school = one(one(pl?.rv ?? null)?.school ?? null)?.name;
+              const rv = one(pl?.rv ?? null);
+              // The payer school, or for an amount added by hand the school the student applied to.
+              const school = one(rv?.school ?? null)?.name ?? one(one(one(rv?.app ?? null)?.product ?? null)?.school ?? null)?.name;
               const rule = one(l.rule);
               const share = team
                 ? `${rule?.method === "percent" ? `${Number(rule.value)}%` : "Fixed"}${l.share && Number(l.share) < 1 ? ` × 1/${Math.round(1 / Number(l.share))}` : ""}`
