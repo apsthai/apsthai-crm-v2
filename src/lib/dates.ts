@@ -40,7 +40,10 @@ export function daysBetween(fromIso: string, toIso: string) {
 export function cycleOf(iso: string) {
   const y = Number(iso.slice(0, 4));
   const m = Number(iso.slice(5, 7));
-  const startYear = m >= 9 ? y : y - 1;
+  return cycleStarting(m >= 9 ? y : y - 1);
+}
+
+export function cycleStarting(startYear: number) {
   return {
     start: `${startYear}-09-01`,
     end: `${startYear + 1}-08-31`,

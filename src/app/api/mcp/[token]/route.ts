@@ -32,9 +32,12 @@ function tokenOk(given: string) {
 const INSTRUCTIONS = `APSthai CRM, read-only, for the advisor. Data is in Postgres views (schema analytics).
 Call list_views first to see the views and columns, then run_query with one SELECT.
 Business notes: the cycle runs September to August (2026-27 = 1 Sep 2026 to 31 Aug 2027). A case is one service for one
-student; overall_status 'success' means enrolled / done, and closed_date is when. Money in is payments.received_thb (THB,
-incl. VAT). receivables are amounts to collect (status expected = not billed yet). Staff points come from points_ledger,
-KPI from kpi_targets. Contact details are not available by design.`;
+student; overall_status 'success' means enrolled / done, and closed_date is when it was approved. A case belongs to the
+cycle of its intake: its success, its points and its revenue count there, however late the money arrives.
+points_ledger.date is that intake. Revenue of a cycle = money in plus money still to collect (receivables) for cases
+with an intake in it. Money in is payments.received_thb (THB, incl. VAT); money in by received_date is cash flow, a
+separate number. receivables are amounts to collect (status expected = not billed yet). KPI from kpi_targets; targets
+(revenue and successful cases per service) are per cycle and count by intake. Contact details are not available by design.`;
 
 const TOOLS = [
   {

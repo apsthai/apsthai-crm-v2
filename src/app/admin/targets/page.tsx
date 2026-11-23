@@ -3,32 +3,31 @@ import { AppShell } from "@/components/app-shell";
 import { Flash } from "@/components/flash";
 import { Submit } from "@/components/submit";
 import { getMe, seesAll } from "@/lib/auth";
-import { cycleOf, todayBangkok } from "@/lib/dates";
+import { loadCycles } from "@/lib/cycle-data";
+import { cycleOf, cycleStarting, todayBangkok } from "@/lib/dates";
 import { fmtTHB } from "@/lib/money";
 import { AdminHeader } from "../tabs";
 import { saveTargets } from "./actions";
 
-// Targets for the Flight Deck: money in for the company, and successful cases per service, per cycle (Sep to Aug).
+// Targets for the Flight Deck: revenue of the cycle for the company, and successful cases per service, per cycle (Sep to Aug).
+// Both count by intake.
 export default async function TargetsPage({ searchParams }: { searchParams: Promise<{ cycle?: string; ok?: string; err?: string }> }) {
   const { supabase: sb, me } = await getMe();
   if (!seesAll(me)) redirect("/dashboard");
   const sp = await searchParams;
   const current = cycleOf(todayBangkok()).start;
   const cycle = /^\d{4}$/.test(sp.cycle ?? "") ? `${sp.cycle}-09-01` : current;
-  const end = `${Number(cycle.slice(0, 4)) + 1}-08-31`;
   const y = Number(current.slice(0, 4));
 
-  const [catsRes, targetsRes, wonRes, payRes] = await Promise.all([
+  // So far: by intake, as on the Flight Deck (owner rule 23 Nov 2026).
+  const [catsRes, targetsRes, [so]] = await Promise.all([
     sb.from("categories").select("id, name_en, active").order("sort_order"),
     sb.from("targets").select("category_id, cases, revenue_thb").eq("cycle_start", cycle),
-    sb.from("cases").select("category_id").eq("overall_status", "success").gte("closed_date", cycle).lte("closed_date", end),
-    sb.from("payments").select("received_thb").gte("received_date", cycle).lte("received_date", end),
+    loadCycles(sb, todayBangkok(), [cycleStarting(Number(cycle.slice(0, 4)))]),
   ]);
   if (catsRes.error) throw new Error(catsRes.error.message);
   const t = new Map((targetsRes.data ?? []).map((r) => [r.category_id as string | null, r]));
-  const won = new Map<string, number>();
-  for (const c of wonRes.data ?? []) won.set(c.category_id, (won.get(c.category_id) ?? 0) + 1);
-  const moneyIn = (payRes.data ?? []).reduce((a, p) => a + Number(p.received_thb), 0);
+  const won = new Map([...so.wonByService].filter(([, n]) => n > 0));
   // Hidden services show only if they already have a target or a result this cycle.
   const cats = (catsRes.data ?? []).filter((c) => c.active || t.has(c.id) || won.has(c.id));
   const company = t.get(null);
@@ -56,9 +55,9 @@ export default async function TargetsPage({ searchParams }: { searchParams: Prom
           <input type="hidden" name="cycle" value={cycle} />
           <input type="hidden" name="services" value={cats.map((c) => c.id).join(",")} />
           <label className="flex flex-wrap items-center gap-3 text-sm">
-            <span className="w-56 font-medium">Money in, whole company (THB, incl. VAT)</span>
-            <input name="revenue" inputMode="decimal" defaultValue={company?.revenue_thb ?? ""} className={box} aria-label="Money-in target" />
-            <span className="text-[13px] text-slate-500">So far {fmtTHB(moneyIn)}</span>
+            <span className="w-56 font-medium">Revenue of the cycle, whole company (THB, incl. VAT)</span>
+            <input name="revenue" inputMode="decimal" defaultValue={company?.revenue_thb ?? ""} className={box} aria-label="Revenue target" />
+            <span className="text-[13px] text-slate-500">So far {fmtTHB(so.revenue)} (money in {fmtTHB(so.received)} + to collect {fmtTHB(so.toCollect)}, cases with an intake in this cycle)</span>
           </label>
           <table className="w-full border-collapse text-sm">
             <thead>

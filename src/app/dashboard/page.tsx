@@ -1,22 +1,38 @@
 import { AppShell, Bar, Card, Tile } from "@/components/app-shell";
 import { getMe, seesAll } from "@/lib/auth";
-import { cycleOf, fmtDate, fmtLongDate, fmtMonth, fmtMonthShort, hourBangkok, todayBangkok } from "@/lib/dates";
+import { loadCycles, type CycleData } from "@/lib/cycle-data";
+import { cycleOf, cycleStarting, daysBetween, fmtDate, fmtLongDate, fmtMonth, fmtMonthShort, hourBangkok, todayBangkok } from "@/lib/dates";
 import { fmtPoints, fmtTHBShort } from "@/lib/money";
 import { loadAdmin, loadCompany, loadMine, type TaskRow } from "./data";
 import { FlightDeck } from "./flight-deck";
 import { loadFlightDeck } from "./flight-data";
 
-export default async function Dashboard() {
+// ?view=2027 shows the cycle Sep 2027 - Aug 2028; ?view=2026v2027 compares two cycles next to each other.
+// No view: today's cycle.
+function parseView(view: string | undefined, current: number) {
+  const one = /^(\d{4})$/.exec(view ?? "");
+  if (one) return [Number(one[1])];
+  const two = /^(\d{4})v(\d{4})$/.exec(view ?? "");
+  if (two && Number(two[2]) === Number(two[1]) + 1) return [Number(two[1]), Number(two[2])];
+  return [current];
+}
+
+export default async function Dashboard({ searchParams }: { searchParams: Promise<{ view?: string }> }) {
   const { supabase, me } = await getMe();
   const today = todayBangkok();
   const cycle = cycleOf(today);
   const isAdmin = seesAll(me);
-  const [mine, company, admin, fd] = await Promise.all([
+  const thisYear = Number(cycle.start.slice(0, 4));
+  const years = parseView((await searchParams).view, thisYear);
+  const [mine, company, admin, fd, cy] = await Promise.all([
     loadMine(supabase, me.id, today, cycle),
     loadCompany(supabase, cycle),
     isAdmin ? loadAdmin(supabase, today, cycle) : Promise.resolve(null),
     isAdmin ? loadFlightDeck(supabase, today, cycle) : Promise.resolve(null),
+    isAdmin ? loadCycles(supabase, today, years.map(cycleStarting)) : Promise.resolve(null),
   ]);
+  const day = daysBetween(cycle.start, today) + 1, total = daysBetween(cycle.start, cycle.end) + 1;
+  const view = years.join("v");
   const h = hourBangkok();
   const greeting = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 
@@ -26,9 +42,12 @@ export default async function Dashboard() {
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold text-slate-900">Flight Deck</h1>
-            <p className="mt-1 text-sm text-slate-500">{fmtLongDate(today)} · {cycle.label} · day {fd.day} of {fd.total} ({Math.round(fd.frac * 100)}% of the cycle gone)</p>
+            <p className="mt-1 text-sm text-slate-500">{fmtLongDate(today)} · {cycle.label} · day {day} of {total} ({Math.round((day / total) * 100)}% of the cycle gone)</p>
           </div>
-          <span className="text-[13px] text-slate-500">{greeting}, {me.codename}</span>
+          <div className="flex flex-wrap items-center gap-4">
+            <span className="text-[13px] text-slate-500">{greeting}, {me.codename}</span>
+            <CyclePicker view={view} thisYear={thisYear} />
+          </div>
         </div>
       ) : (
         <div>
@@ -36,7 +55,7 @@ export default async function Dashboard() {
           <p className="mt-1 text-sm text-slate-500">{fmtLongDate(today)} · {cycle.label}</p>
         </div>
       )}
-      {admin && fd ? <AdminView admin={admin} fd={fd} mine={mine} />
+      {admin && fd && cy ? <AdminView admin={admin} fd={fd} cy={cy} current={view === String(thisYear)} mine={mine} />
         : <StaffView mine={mine} company={company} cycle={cycle.label} />}
     </AppShell>
   );
@@ -118,7 +137,27 @@ function StaffView({ mine, company, cycle }: { mine: Mine; company: Awaited<Retu
   );
 }
 
-function AdminView({ admin, fd, mine }: { admin: Admin; fd: FD; mine: Mine }) {
+const cyLabel = (y: number) => `Sep ${y} - Aug ${y + 1}`;
+
+// Choose one cycle (today's is the default) or two cycles next to each other to compare.
+function CyclePicker({ view, thisYear }: { view: string; thisYear: number }) {
+  const ys = [thisYear - 1, thisYear, thisYear + 1, thisYear + 2];
+  return (
+    <form action="/dashboard" className="flex items-center gap-2 text-sm">
+      <select name="view" defaultValue={view} aria-label="Cycle" className="rounded-lg border border-slate-300 bg-white px-2.5 py-1.5">
+        <optgroup label="One cycle">
+          {ys.map((y) => <option key={y} value={String(y)}>{cyLabel(y)}{y === thisYear ? " (this cycle)" : ""}</option>)}
+        </optgroup>
+        <optgroup label="Compare two cycles">
+          {ys.slice(0, -1).map((y) => <option key={y} value={`${y}v${y + 1}`}>{`${y}-${String(y + 1).slice(2)} vs ${y + 1}-${String(y + 2).slice(2)}`}</option>)}
+        </optgroup>
+      </select>
+      <button className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-navy">Show</button>
+    </form>
+  );
+}
+
+function AdminView({ admin, fd, cy, current, mine }: { admin: Admin; fd: FD; cy: CycleData[]; current: boolean; mine: Mine }) {
   const max = Math.max(1, ...admin.forecast.map((f) => f.confirmed + f.pipeline));
   const maxPipe = Math.max(1, ...admin.pipeline.map((p) => p.thb));
   return (
@@ -129,7 +168,7 @@ function AdminView({ admin, fd, mine }: { admin: Admin; fd: FD; mine: Mine }) {
         </p>
       )}
 
-      <FlightDeck fd={fd} />
+      <FlightDeck fd={fd} cy={cy} current={current} />
 
       <div className="flex flex-wrap items-stretch gap-6">
         <Card title="Forecast, next 6 months" sub="Incl. VAT" className="flex-[3_1_520px]"

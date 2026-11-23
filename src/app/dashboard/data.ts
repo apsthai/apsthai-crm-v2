@@ -94,8 +94,9 @@ export async function loadMine(sb: SupabaseClient, staffId: string, today: strin
 // Company direction without money: for every staff member.
 export async function loadCompany(sb: SupabaseClient, cycle: Cycle) {
   const [won, active] = await Promise.all([
+    // A successful case counts in the cycle of its intake (owner rule 23 Nov 2026).
     sb.from("cases").select("id", { count: "exact", head: true }).eq("overall_status", "success")
-      .gte("closed_date", cycle.start).lte("closed_date", cycle.end),
+      .gte("intake", cycle.start).lte("intake", cycle.end),
     sb.from("cases").select("id", { count: "exact", head: true }).in("overall_status", ACTIVE),
   ]);
   fail("successful cases", won.error); fail("active cases", active.error);
@@ -112,7 +113,7 @@ export async function loadAdmin(sb: SupabaseClient, today: string, cycle: Cycle)
     sb.from("categories").select("id, name_en, sort_order"),
     sb.from("payouts").select("pay_date, total, status").in("status", ["draft", "reviewed"]).order("pay_date"),
     sb.from("stage_updates").select("id, case:cases(category:categories(name_en))").eq("approval", "pending"),
-    sb.from("cases").select("id, overall_status, closed_date"),
+    sb.from("cases").select("id, overall_status, intake"),
     sb.from("tasks").select("case_id, assigned_to, due_date").is("done_at", null),
     sb.from("staff").select("id, codename, employment").eq("active", true).eq("handles_cases", true).order("codename"),
     sb.from("case_staff").select("case_id, staff_id, end_date"),
@@ -174,9 +175,9 @@ export async function loadAdmin(sb: SupabaseClient, today: string, cycle: Cycle)
   const nextPay = openPayouts[0]?.pay_date;
   const round = nextPay ? openPayouts.filter((p) => p.pay_date === nextPay) : [];
 
-  const allCases = (cases.data ?? []) as { id: string; overall_status: string; closed_date: string | null }[];
+  const allCases = (cases.data ?? []) as { id: string; overall_status: string; intake: string | null }[];
   const activeIds = new Set(allCases.filter((c) => ACTIVE.includes(c.overall_status)).map((c) => c.id));
-  const won = new Set(allCases.filter((c) => c.overall_status === "success" && c.closed_date && c.closed_date >= cycle.start && c.closed_date <= cycle.end).map((c) => c.id));
+  const won = new Set(allCases.filter((c) => c.overall_status === "success" && c.intake && c.intake >= cycle.start && c.intake <= cycle.end).map((c) => c.id));
   const tasksOpen = (openTasks.data ?? []) as { case_id: string; assigned_to: string; due_date: string }[];
   const withTask = new Set(tasksOpen.map((t) => t.case_id));
   const noTask = [...activeIds].filter((id) => !withTask.has(id)).length;
