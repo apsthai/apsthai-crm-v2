@@ -97,7 +97,8 @@ export async function loadCompany(sb: SupabaseClient, cycle: Cycle) {
     // A successful case counts in the cycle of its intake (owner rule 23 Nov 2026).
     sb.from("cases").select("id", { count: "exact", head: true }).eq("overall_status", "success")
       .gte("intake", cycle.start).lte("intake", cycle.end),
-    sb.from("cases").select("id", { count: "exact", head: true }).in("overall_status", ACTIVE),
+    sb.from("cases").select("id", { count: "exact", head: true }).in("overall_status", ACTIVE)
+      .gte("intake", cycle.start).lte("intake", cycle.end),
   ]);
   fail("successful cases", won.error); fail("active cases", active.error);
   return { successful: won.count ?? 0, active: active.count ?? 0 };
