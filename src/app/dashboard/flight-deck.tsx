@@ -43,9 +43,10 @@ export function FlightDeck({ fd, cy, current }: { fd: FD; cy: CycleData[]; curre
   const lights: { on: boolean; tone: string; text: string; href?: string; ok: string }[] = [
     { on: l.approvals > 0, tone: red, text: `${l.approvals} ${l.approvals === 1 ? "success" : "successes"} waiting for approval`, href: "/approvals", ok: "Nothing waiting for approval" },
     { on: l.overdue > 0, tone: red, text: `${l.overdue} ${l.overdue === 1 ? "invoice" : "invoices"} unpaid over 30 days`, href: "/financial/invoices", ok: "No invoice unpaid over 30 days" },
-    { on: l.noTask > 0, tone: amber, text: `${l.noTask} active ${l.noTask === 1 ? "case" : "cases"} with no open task`, href: "/cases", ok: "Every active case has a next task" },
+    { on: l.veryLate > 0, tone: red, text: `${l.veryLate} ${l.veryLate === 1 ? "task" : "tasks"} more than a week late`, href: "/reminders", ok: "No task more than a week late" },
+    { on: l.noTask > 0, tone: amber, text: `${l.noTask} active ${l.noTask === 1 ? "case" : "cases"} with no open task`, href: "/reminders", ok: "Every active case has a next task" },
     { on: l.quiet.length > 0, tone: amber, text: `No new case this week: ${l.quiet.join(", ")}`, ok: "Everyone with a KPI has a new case this week" },
-    { on: l.stale > 0, tone: amber, text: `${l.stale} active ${l.stale === 1 ? "case" : "cases"} untouched for 14 days`, href: "/cases", ok: "No case untouched for 14 days" },
+    { on: l.stale > 0, tone: amber, text: `${l.stale} active ${l.stale === 1 ? "case" : "cases"} untouched for 14 days`, href: "/reminders", ok: "No case untouched for 14 days" },
     { on: l.noConsent > 0, tone: amber, text: `${l.noConsent} active ${l.noConsent === 1 ? "case" : "cases"} without PDPA consent`, href: "/cases?consent=no", ok: "Every active case has PDPA consent" },
     { on: l.billSoon > 0, tone: amber, text: `${l.billSoon} ${l.billSoon === 1 ? "amount" : "amounts"} to bill in the next 7 days`, href: "/financial", ok: "Nothing to bill this week" },
   ];

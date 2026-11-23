@@ -30,7 +30,7 @@ export async function loadFlightDeck(sb: SupabaseClient, today: string, cycle: C
     sb.from("staff").select("id, codename").eq("active", true).eq("handles_cases", true),
     sb.from("case_staff").select("case_id, staff_id").is("end_date", null),
     sb.from("kpi_targets").select("staff_id, points").eq("cycle_start", cycle.start),
-    sb.from("tasks").select("case_id").is("done_at", null),
+    sb.from("tasks").select("case_id, due_date").is("done_at", null),
     sb.from("stage_updates").select("case_id").gte("created_at", twoWeeksAgo),
   ]);
   for (const [n, r] of Object.entries({ cases, pays, invs, recv, rates, pending, progress, flow, staff, links, kpis, tasks, updates })) fail(n, r.error);
@@ -105,6 +105,6 @@ export async function loadFlightDeck(sb: SupabaseClient, today: string, cycle: C
       billSoon, notBilled, notBilledCount: rv.length, toConfirm, missing,
     },
     closing,
-    lights: { noConsent: active.filter((c) => !c.student?.pdpa_consent_date).length, approvals: pending.count ?? 0, overdue: overdue.length, noTask: active.filter((c) => !withTask.has(c.id)).length, quiet, stale, billSoon },
+    lights: { veryLate: ((tasks.data ?? []) as { due_date: string }[]).filter((t) => t.due_date < addDays(today, -7)).length, noConsent: active.filter((c) => !c.student?.pdpa_consent_date).length, approvals: pending.count ?? 0, overdue: overdue.length, noTask: active.filter((c) => !withTask.has(c.id)).length, quiet, stale, billSoon },
   };
 }

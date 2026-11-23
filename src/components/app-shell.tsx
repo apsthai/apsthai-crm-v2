@@ -2,6 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 
 import { getMe, isViewer, seesAll } from "@/lib/auth";
+import { addDays, todayBangkok } from "@/lib/dates";
 import { ReadOnlyGuard } from "./read-only-guard";
 
 // The header loads who is signed in itself (cached per request), and shows Approvals with a count to admin only.
@@ -9,11 +10,20 @@ export async function AppShell({ active, children }: { name?: string; active: st
   const { supabase, me } = await getMe();
   const isAdmin = seesAll(me);
   const viewer = isViewer(me);
-  const { count } = isAdmin
-    ? await supabase.from("stage_updates").select("id", { count: "exact", head: true }).eq("approval", "pending")
-    : { count: 0 };
+  const today = todayBangkok();
+  // Reminders badge: staff see their own tasks late or due today; admin and viewer see tasks more than 7 days late.
+  const remind = isAdmin
+    ? supabase.from("tasks").select("id", { count: "exact", head: true }).is("done_at", null).lt("due_date", addDays(today, -7))
+    : supabase.from("tasks").select("id", { count: "exact", head: true }).is("done_at", null).eq("assigned_to", me.id).lte("due_date", today);
+  const [{ count }, { count: reminders }] = await Promise.all([
+    isAdmin
+      ? supabase.from("stage_updates").select("id", { count: "exact", head: true }).eq("approval", "pending")
+      : Promise.resolve({ count: 0 }),
+    remind,
+  ]);
   const nav = [
     { href: "/dashboard", label: "Dashboard" },
+    { href: "/reminders", label: "Reminders", badge: reminders ?? 0 },
     { href: "/cases", label: "Cases" },
     ...(isAdmin ? [{ href: "/approvals", label: "Approvals", badge: count ?? 0 }, { href: "/financial", label: "Financial" }, { href: "/admin", label: "Admin" }] : []),
   ] as { href: string; label: string; badge?: number }[];
