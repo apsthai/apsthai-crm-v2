@@ -13,6 +13,12 @@ type Payer = { id: string; name: string; kind: string; address: string | null; c
 type Line = { receivableId: string; description: string; amount: string };
 const KINDS = [["school", "School"], ["agent", "Agent"], ["company", "Company"], ["person", "Person"]];
 const toNum = (s: string) => Number(s.replace(/,/g, "")) || 0;
+// A country typed as the last line of the address would print twice, or clash with the Country box.
+const COUNTRY_WORDS = [...COUNTRIES, "UK", "England", "Scotland", "Wales", "USA", "US"].map((c) => c.toLowerCase());
+const addressCountry = (a: string) => {
+  const last = a.split("\n").map((l) => l.trim()).filter(Boolean).pop() ?? "";
+  return COUNTRY_WORDS.includes(last.replace(/[.,]$/, "").toLowerCase()) ? last : null;
+};
 
 export function InvoiceForm({ start, others, payers, suggested, schoolName, today }:
   { start: Rv[]; others: Rv[]; payers: Payer[]; suggested: string | null; schoolName: string; today: string }) {
@@ -23,7 +29,7 @@ export function InvoiceForm({ start, others, payers, suggested, schoolName, toda
   const [name, setName] = useState(first?.name ?? schoolName);
   const [kind, setKind] = useState(first?.kind ?? "school");
   const [address, setAddress] = useState(first?.address ?? "");
-  const [country, setCountry] = useState(first?.country ?? "United Kingdom");
+  const [country, setCountry] = useState(first?.country ?? "");
   const [taxId, setTaxId] = useState(first?.tax_id ?? "");
   const [wht, setWht] = useState((first?.country === "Thailand") && first?.kind === "company");
   const [lines, setLines] = useState<Line[]>(start.map((r) => ({ receivableId: r.id, description: r.defaultText, amount: n2(r.amount) })));
@@ -32,14 +38,15 @@ export function InvoiceForm({ start, others, payers, suggested, schoolName, toda
   const used = new Set(lines.map((l) => l.receivableId));
   const canAdd = others.filter((r) => r.currency === currency && !used.has(r.id));
   const thai = country === "Thailand";
+  const addrCountry = addressCountry(address);
   const total = round2(lines.reduce((s, l) => s + toNum(l.amount), 0));
   const t = thaiTotals(total, thai && wht ? 3 : 0);
 
   function pickPayer(id: string) {
     setPayerId(id);
     const p = payers.find((x) => x.id === id);
-    if (!p) { setName(""); setAddress(""); setTaxId(""); return; }
-    setName(p.name); setKind(p.kind); setAddress(p.address ?? ""); setCountry(p.country ?? "United Kingdom"); setTaxId(p.tax_id ?? "");
+    if (!p) { setName(""); setAddress(""); setCountry(""); setTaxId(""); setWht(false); return; }
+    setName(p.name); setKind(p.kind); setAddress(p.address ?? ""); setCountry(p.country ?? ""); setTaxId(p.tax_id ?? "");
     setWht(p.country === "Thailand" && p.kind === "company");
   }
   const setLine = (i: number, patch: Partial<Line>) => setLines((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)));
@@ -72,16 +79,24 @@ export function InvoiceForm({ start, others, payers, suggested, schoolName, toda
                 </select>
               </Field>
               <Field label="Country">
-                <select value={country} onChange={(e) => { setCountry(e.target.value); setWht(e.target.value === "Thailand" && kind === "company"); }} className={inputCls}>
-                  {[...new Set([country, ...COUNTRIES])].map((c) => <option key={c}>{c}</option>)}
+                <select value={country} required onChange={(e) => { setCountry(e.target.value); setWht(e.target.value === "Thailand" && kind === "company"); }} className={inputCls}>
+                  <option value="" disabled>Choose…</option>
+                  {[...new Set([country, ...COUNTRIES].filter(Boolean))].map((c) => <option key={c}>{c}</option>)}
                 </select>
               </Field>
             </div>
-            <Field label="Address"><textarea rows={3} value={address} onChange={(e) => setAddress(e.target.value)} className={inputCls} /></Field>
+            <div className="flex flex-col gap-1">
+              <Field label="Address"><textarea rows={3} value={address} onChange={(e) => setAddress(e.target.value)} className={inputCls} /></Field>
+              {addrCountry
+                ? <p className="text-xs text-amber-700">The country prints from the Country box{country ? ` (${country})` : ""}. Remove &quot;{addrCountry}&quot; from the address.</p>
+                : <p className="text-xs text-slate-500">Without the country: it prints from the Country box.</p>}
+            </div>
             {thai && <Field label="Tax ID (13 digits)"><input value={taxId} onChange={(e) => setTaxId(e.target.value)} inputMode="numeric" className={inputCls} /></Field>}
           </div>
           <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg bg-slate-50 px-3 py-2 text-[13px] text-slate-600">
-            <span>Invoice language: <b>{thai ? "Thai" : "English"}</b> ({thai ? "payer in Thailand" : "payer outside Thailand"})</span>
+            {country
+              ? <span>Invoice language: <b>{thai ? "Thai" : "English"}</b> ({thai ? "payer in Thailand" : "payer outside Thailand"})</span>
+              : <span className="text-amber-700">Choose the country of the payer: the office that pays us, which may not be the school&apos;s country.</span>}
             {thai ? (
               <label className={`flex items-center gap-2 ${kind === "company" ? "" : "opacity-50"}`}>
                 <input type="checkbox" checked={wht} disabled={kind !== "company"} onChange={(e) => setWht(e.target.checked)} className="size-4 accent-navy" />

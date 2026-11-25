@@ -91,6 +91,7 @@ export async function createInvoice(_prev: InvoiceState, fd: FormData): Promise<
   let d: Draft;
   try { d = JSON.parse(String(fd.get("draft"))); } catch { return { error: "Something went wrong, please try again" }; }
   if (!d.name.trim()) return { error: "Enter who we are billing" };
+  if (!d.country) return { error: "Choose the country of the payer" };
   if (!d.lines.length) return { error: "Add at least one student" };
   if (d.lines.some((l) => !l.description.trim() || !(l.amount > 0))) return { error: "Every line needs text and an amount" };
 
