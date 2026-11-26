@@ -6,12 +6,13 @@ import { Flash } from "@/components/flash";
 import { Submit } from "@/components/submit";
 import { DatePick, MonthPick } from "@/components/date-pick";
 import { UndoButton } from "@/components/undo-success";
+import { DeleteButton } from "@/components/delete-button";
 import { getMe, isViewer, seesAll } from "@/lib/auth";
 import { PdpaFields } from "@/components/pdpa-fields";
 import { pdpaByWord } from "@/lib/pdpa";
 import { addDays, daysBetween, fmtDate, fmtMonth, todayBangkok } from "@/lib/dates";
 import { fmtTHB } from "@/lib/money";
-import { addFeedback, updateApplication, addStaff, addTask, closeLost, endStaff, reopenCase, setResult, toggleTask, updateCase, updateStudent, deleteCase, updateTask, deleteTask, savePdpa } from "./actions";
+import { addFeedback, updateApplication, addStaff, addTask, closeLost, endStaff, reopenCase, setResult, toggleTask, updateCase, updateStudent, deleteCase, updateTask, deleteTask, savePdpa, deleteApplication } from "./actions";
 import { AddSchool } from "./add-school";
 import { ResultSelect } from "./result-select";
 import { SubAgentFields } from "./sub-agent-fields";
@@ -93,6 +94,8 @@ export default async function CasePage({ params, searchParams }: {
       : Promise.resolve({ data: [] }),
     sb.from("change_log").select("old_value, changed_at, changed_by").eq("table_name", "tasks").eq("action", "delete").like("old_value", `%"case_id": "${id}"%`),
   ]);
+  // Schools removed from the case (found by their case in the logged row).
+  const { data: appDelLog } = await sb.from("change_log").select("old_value, changed_at, changed_by").eq("table_name", "applications").eq("action", "delete").like("old_value", `%"case_id": "${id}"%`);
   const { data: revertLog } = await sb.from("change_log").select("changed_at, changed_by").eq("table_name", "cases").eq("action", "revert").eq("row_id", id);
   const { data: fb } = appIds.length
     ? await sb.from("feedback").select("id, application_id, date, feedback, action, created_at, created_by").in("application_id", appIds).order("date", { ascending: false })
@@ -134,7 +137,7 @@ export default async function CasePage({ params, searchParams }: {
   const chance = prog.data ? Math.round(Number(prog.data.probability_pct)) : 0;
   const weightedTHB = (weighted.data ?? []).reduce((a, r) => a + Number(r.amount_thb), 0);
   const { data: recv } = canMoney
-    ? await sb.from("receivables").select("id, type, payer_name, amount, currency, expected_date, status, school:schools(name), partner:partners(name), payment_lines(amount)").eq("case_id", id).order("expected_date")
+    ? await sb.from("receivables").select("id, type, payer_name, amount, currency, expected_date, status, school:schools(name), partner:partners(name), payment_lines(amount), application_id").eq("case_id", id).order("expected_date")
     : { data: [] };
 
   const taskRows = (tasks.data ?? []) as { id: string; title: string; due_date: string; assigned_to: string | null; done_at: string | null; done_by: string | null; created_at: string; created_by: string | null }[];
@@ -143,6 +146,14 @@ export default async function CasePage({ params, searchParams }: {
   const fbRows = (fb ?? []) as { id: string; application_id: string; date: string; feedback: string; action: string | null; created_at: string; created_by: string | null }[];
   const stageName = new Map(stageRows.map((st) => [st.id, st.name_en]));
   const appById = new Map(appRows.map((a) => [a.id, a]));
+  // A school can be removed only while nothing uses it: no stage, no feedback, no amount, no result.
+  const usedApps = new Set<string>([
+    ...((stageLog.data ?? []) as { application_id: string | null }[]).map((u) => u.application_id ?? ""),
+    ...fbRows.map((f) => f.application_id),
+    ...((recv ?? []) as { application_id: string | null }[]).map((r) => r.application_id ?? ""),
+  ]);
+  type Prod = { id: string; school: { name: string } | null; partner: { name: string } | null };
+  const productName = new Map(((products.data ?? []) as unknown as Prod[]).map((p) => [p.id, p.school?.name ?? p.partner?.name ?? "School"]));
   const handlers = (staff.data ?? []).filter((st) => st.handles_cases && st.active && !current.some((l) => l.staff_id === st.id));
   const assignable = current.length ? current.map((l) => l.staff_id) : [me.id];
 
@@ -158,6 +169,8 @@ export default async function CasePage({ params, searchParams }: {
       .map((l) => ({ at: l.changed_at, by: l.changed_by, what: l.action === "approve" ? "Success approved" : `Success rejected: ${l.new_value ?? ""}` })),
     ...((revertLog ?? []) as { changed_at: string; changed_by: string | null }[])
       .map((l) => ({ at: l.changed_at, by: l.changed_by, what: "Success undone, case back in progress" })),
+    ...((appDelLog ?? []) as { old_value: string | null; changed_at: string; changed_by: string | null }[])
+      .map((l) => { let name = "School"; try { name = productName.get(JSON.parse(l.old_value ?? "{}").product_id) ?? name; } catch { /* keep */ } return { at: l.changed_at, by: l.changed_by, what: `School removed: ${name}` }; }),
     ...taskRows.map((t) => ({ at: t.created_at, by: t.created_by, what: `Task added: ${t.title}` })),
     ...((taskEditLog.data ?? []) as { row_id: string; field: string; old_value: string | null; new_value: string | null; changed_at: string; changed_by: string | null }[])
       .map((l) => {
@@ -322,6 +335,12 @@ export default async function CasePage({ params, searchParams }: {
                             <Submit variant="ghost">Save</Submit>
                           </form>
                         </details>
+                      )}
+                      {canEdit && a.result === "in_progress" && !usedApps.has(a.id) && (
+                        <div className="mt-2">
+                          <DeleteButton action={deleteApplication} fields={{ case_id: id, application_id: a.id }} label="Remove school" small
+                            question={`Remove ${appName(a)} from this case?`} />
+                        </div>
                       )}
                       {fbs[0] && <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-[13px] text-slate-600">{fmtDate(fbs[0].date)} · {fbs[0].feedback}{fbs[0].action ? ` · Next: ${fbs[0].action}` : ""}</div>}
                       {(fbs.length > 1 || canEdit) && (

@@ -63,6 +63,26 @@ export async function setResult(fd: FormData) {
   back(caseId, changed(r));
 }
 
+// Remove a school added by mistake. Only while nothing uses it: deleting it would also delete its stages and feedback.
+export async function deleteApplication(fd: FormData) {
+  const { supabase } = await getMe();
+  const caseId = s(fd, "case_id")!;
+  const appId = s(fd, "application_id")!;
+  const [app, st, fb, rv] = await Promise.all([
+    supabase.from("applications").select("result").eq("id", appId).maybeSingle(),
+    supabase.from("stage_updates").select("id", { count: "exact", head: true }).eq("application_id", appId),
+    supabase.from("feedback").select("id", { count: "exact", head: true }).eq("application_id", appId),
+    supabase.from("receivables").select("id", { count: "exact", head: true }).eq("application_id", appId),
+  ]);
+  const err = app.error ?? st.error ?? fb.error ?? rv.error;
+  if (err) return back(caseId, err);
+  if (!app.data) return back(caseId, "You are not allowed to change this");
+  if (app.data.result !== "in_progress" || st.count || fb.count || rv.count)
+    return back(caseId, "This school already has stages, feedback, an amount or a result, so it cannot be removed. Set it to Withdrawn instead.");
+  const r = await supabase.from("applications").delete().eq("id", appId).select("id");
+  back(caseId, changed(r));
+}
+
 export async function addFeedback(fd: FormData) {
   const { supabase } = await getMe();
   const caseId = s(fd, "case_id")!;
